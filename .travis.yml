@@ -27,6 +27,6 @@ install:
   - sudo apt-get install mono-devel
   - sudo apt-get install nunit-console
   - npm install
-  - xbuild ./src/edge-db.sln
+  - xbuild ./edge-db.sln
   - nunit-console ./src/unitTest/bin/Debug/unitTest.dll
   
