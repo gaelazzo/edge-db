@@ -1,6 +1,7 @@
-language: node_js
-node_js:
-  - "5"
+language: csharp
+solution: edge-db.sln
+before_install:
+  - sudo apt-get install nunit-console
 services:
     - mysql
 env:
@@ -16,7 +17,6 @@ addons:
 
 before_install:
 - mysql -e "create database IF NOT EXISTS test;" -uroot
-- npm install -g grunt-cli
 - nuget restore edge-db.sln
 
 install:
