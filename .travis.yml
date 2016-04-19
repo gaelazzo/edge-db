@@ -16,7 +16,8 @@ addons:
 
 before_install:
 - mysql -e "create database IF NOT EXISTS test;" -uroot
-- nuget restore ./edge-db.sln
+- npm install -g grunt-cli
+- nuget restore edge-db.sln
 
 install:
   - sudo apt-key adv --keyserver pgp.mit.edu --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
@@ -27,6 +28,6 @@ install:
   - sudo apt-get install mono-devel
   - sudo apt-get install nunit-console
   - npm install
-  - xbuild ./edge-db.sln
-  - nunit-console ./src/unitTest/bin/Debug/unitTest.dll
+  - xbuild edge-db.sln
+  - nunit-console ./unitTest/bin/Debug/unitTest.dll
   
