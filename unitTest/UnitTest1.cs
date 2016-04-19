@@ -35,7 +35,7 @@ namespace unitTest {
 
         string getConnectionString() {
             string connName = "mySql";
-            if (System.Environment.GetEnvironmentVariable("travis") != null) {
+            if (System.Environment.GetEnvironmentVariable("TRAVIS") != null) {
                 connName = "travis";
             }
             return ConfigurationManager.ConnectionStrings[connName].ConnectionString;
@@ -43,7 +43,7 @@ namespace unitTest {
 
         string getDriver() {
             string connName = "mySql";
-            if (System.Environment.GetEnvironmentVariable("travis") != null) {
+            if (System.Environment.GetEnvironmentVariable("TRAVIS") != null) {
                 connName = "travis";
             }
             return ConfigurationManager.AppSettings["driver." + connName];
