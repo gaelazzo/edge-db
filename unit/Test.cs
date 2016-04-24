@@ -330,7 +330,7 @@ namespace unit {
             int handler = setupDb.open();
 
             Dictionary<string, object> param = new Dictionary<string, object> {
-                ["source"] = "select * from customerkind;select * from sellerkind",
+                ["source"] = "select * from customerkind limit 7;select * from sellerkind limit 3",
                 //["cmd"] = "nonquery",
                 ["handler"] = handler,
                 ["driver"] = setupDb.getDriver()
@@ -350,9 +350,123 @@ namespace unit {
 
             Assert.IsInstanceOf(typeof(Object[]), resultSet1["meta"], "ResultSet1.meta is a Object[] ");
             Assert.IsInstanceOf(typeof(List<object>), resultSet1["rows"], "ResultSet1.rows is a list<object> ");
+            List<object> rows1 = (List<object>) resultSet1["rows"];
+            Assert.AreEqual(7, rows1.Count, "ResultSet1.rows is a list<object> of 7 elements ");
 
             Assert.IsInstanceOf(typeof(Object[]), resultSet2["meta"], "ResultSet2.meta is a Object[] ");
             Assert.IsInstanceOf(typeof(List<object>), resultSet2["rows"], "ResultSet2.rows is a list<object> ");
+            List<object> rows2 = (List<object>)resultSet2["rows"];
+            Assert.AreEqual(3, rows2.Count, "ResultSet1.rows is a list<object> of 3 elements ");
+
+            setupDb.close(handler);
+        }
+
+        [Test()]
+        public void selectFromCustomerKindRowsWithCallBack() {
+            int handler = setupDb.open();
+            var resultSet = new List<object>();
+            int nCount = 0;
+            var callBack = new Func<object, Task<object>>((o) => {
+                resultSet.Add(o);
+                nCount++;
+                return null;
+            });
+
+            Dictionary<string, object> param = new Dictionary<string, object> {
+                ["source"] = "select * from customerkind limit 6;",
+                ["callback"] = callBack,
+                ["handler"] = handler,
+                ["driver"] = setupDb.getDriver()
+            };
+            EdgeCompiler ec = new EdgeCompiler();
+            var t = ec.CompileFunc(param);
+            var tRes = t.Invoke(null);
+            Task.WaitAll(tRes);
+            Assert.IsInstanceOf(typeof(List<object>), tRes.Result, "query without callback should return  a List<object[]> ");
+            List<object> res = (List<object>)tRes.Result;
+            Assert.AreEqual(3, nCount,"Callback should be called 3 times");
+            Assert.IsAssignableFrom(typeof(Dictionary<string, object>), resultSet[0]);
+            Assert.IsAssignableFrom(typeof(Dictionary<string, object>), resultSet[1]);
+            Assert.IsAssignableFrom(typeof(Dictionary<string, object>), resultSet[2]);
+
+            Dictionary<string, object> resSet1 = (Dictionary<string, object>) resultSet[0];
+            Dictionary<string, object> resSet2 = (Dictionary<string, object>)resultSet[1];
+            Dictionary<string, object> resSet3 = (Dictionary<string, object>)resultSet[2];
+
+
+            Assert.IsTrue(resSet1.ContainsKey("meta"), "First resultset has meta");
+            Assert.IsFalse(resSet2.ContainsKey("meta"), "Second resultset has no meta");
+            Assert.IsFalse(resSet3.ContainsKey("meta"), "Third resultset has no meta");
+
+            Assert.IsFalse(resSet1.ContainsKey("rows"), "First resultset has no rows");
+            Assert.IsTrue(resSet2.ContainsKey("rows"), "Second resultset has rows");
+            Assert.AreEqual(6, ((List<object>) resSet2["rows"]).Count, "Second resultset has 6 rows");
+            Assert.IsFalse(resSet3.ContainsKey("rows"), "Third resultset has no rows");
+
+            Assert.IsFalse(resSet1.ContainsKey("resolve"), "First resultset has no resolve");
+            Assert.IsFalse(resSet2.ContainsKey("resolve"), "Second resultset has no resolve");
+            Assert.IsTrue(resSet3.ContainsKey("resolve"), "Third resultset has resolve");
+
+            setupDb.close(handler);
+        }
+
+
+        [Test()]
+        public void selectFromCustomerKindRowsWithCallBackAndPacketSize() {
+            int handler = setupDb.open();
+            var resultSet = new List<object>();
+            int nCount = 0;
+            var callBack = new Func<object, Task<object>>((o) => {
+                resultSet.Add(o);
+                nCount++;
+                return null;
+            });
+
+            Dictionary<string, object> param = new Dictionary<string, object> {
+                ["source"] = "select * from customerkind;",
+                ["callback"] = callBack,
+                ["packetSize"] = 5,
+                ["handler"] = handler,
+                ["driver"] = setupDb.getDriver()
+            };
+            EdgeCompiler ec = new EdgeCompiler();
+            var t = ec.CompileFunc(param);
+            var tRes = t.Invoke(null);
+            Task.WaitAll(tRes);
+            Assert.IsInstanceOf(typeof(List<object>), tRes.Result, "query without callback should return  a List<object[]> ");
+            List<object> res = (List<object>)tRes.Result;
+            Assert.AreEqual(10, nCount, "Callback should be called 10 times");
+            for (int i = 0; i < 10; i++) {
+                Dictionary<string, object> resSet = (Dictionary<string, object>) resultSet[i];
+                if (i == 0) {
+                    Assert.IsTrue(resSet.ContainsKey("meta"), "First resultset has meta");
+                }
+                else {
+                    Assert.IsFalse(resSet.ContainsKey("meta"), "Subsequent resultsets has no meta");
+                }
+
+                if (i == 0 || i==9) {
+                    Assert.IsFalse(resSet.ContainsKey("rows"), "First and last resultset has no rows");
+                }
+                else {
+                    Assert.IsTrue(resSet.ContainsKey("rows"), "Subsequent resultsets has rows");
+                    List<object> rows = (List<object>)resSet["rows"];
+                    Assert.AreEqual(rows.Count, 5);
+                    for (int j = 0; j < 5; j++) {
+                        Object[] values = (Object[])rows[j];
+                        Assert.AreEqual(((i-1) * 5 + j) * 3,values[0]);
+                        Assert.AreEqual("name" + (((i-1) * 5 + j) * 3), values[1].ToString());
+                        Assert.IsInstanceOf(typeof(Int32), values[2]);
+                    }
+                }
+
+                if (i == 9) {
+                    Assert.IsTrue(resSet.ContainsKey("resolve"), "Last resultset has resolve");
+                }
+                else {
+                    Assert.IsFalse(resSet.ContainsKey("resolve"), "Other resultsets has no resolve");
+                }
+            }
 
             setupDb.close(handler);
         }
