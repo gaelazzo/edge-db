@@ -324,6 +324,38 @@ namespace unit {
             }
             setupDb.close(handler);
         }
+
+        [Test()]
+        public void twoSelectShouldReturnTwoResultSet() {
+            int handler = setupDb.open();
+
+            Dictionary<string, object> param = new Dictionary<string, object> {
+                ["source"] = "select * from customerkind;select * from sellerkind",
+                //["cmd"] = "nonquery",
+                ["handler"] = handler,
+                ["driver"] = setupDb.getDriver()
+            };
+            EdgeCompiler ec = new EdgeCompiler();
+            var t = ec.CompileFunc(param);
+            var tRes = t.Invoke(null);
+            Task.WaitAll(tRes);
+            Assert.IsInstanceOf(typeof(List<object>), tRes.Result, "query without callback should return  a List<object[]> ");
+            List<object> res = (List<object>)tRes.Result;
+            Assert.AreEqual(res.Count, 2, "query with two select should return two resultset");
+            Assert.IsInstanceOf(typeof(Dictionary<string, object>), res[0], "Result set 1 is a dictionary<string,object>");
+            Assert.IsInstanceOf(typeof(Dictionary<string, object>), res[1], "Result set 2 is a dictionary<string,object>");
+
+            Dictionary<string, object> resultSet1 = (Dictionary<string, object>)res[0];
+            Dictionary<string, object> resultSet2 = (Dictionary<string, object>)res[1];
+
+            Assert.IsInstanceOf(typeof(Object[]), resultSet1["meta"], "ResultSet1.meta is a Object[] ");
+            Assert.IsInstanceOf(typeof(List<object>), resultSet1["rows"], "ResultSet1.rows is a list<object> ");
+
+            Assert.IsInstanceOf(typeof(Object[]), resultSet2["meta"], "ResultSet2.meta is a Object[] ");
+            Assert.IsInstanceOf(typeof(List<object>), resultSet2["rows"], "ResultSet2.rows is a list<object> ");
+
+            setupDb.close(handler);
+        }
     }
 }
 
