@@ -29,5 +29,5 @@ install:
   - sudo apt-get install nunit-console
   - npm install
   - xbuild edge-db.sln
-  - nunit-console ./unitTest/bin/Debug/unitTest.dll
+  - nunit-console ./unit/bin/Debug/unit.dll
   
