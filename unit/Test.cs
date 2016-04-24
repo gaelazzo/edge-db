@@ -8,148 +8,48 @@ using System.IO;
 
 
 namespace unit {
+    [SetUpFixture]
+    public class setupDb {
+        public static int open() {
+            Dictionary<string, object> param = new Dictionary<string, object>();
+            param["connectionString"] = getConnectionString();
+            param["driver"] = getDriver();
+            param["cmd"] = "open";
+            EdgeCompiler ec = new EdgeCompiler();
+            var t = ec.CompileFunc(param);
+            var res = t.Invoke(null);
+            Task.WaitAll(res);
+            return (int)res.Result;
+        }
 
-	[TestFixture()]
-	public class UnitTest1 {
-		int open() {
-			Dictionary<string, object> param = new Dictionary<string, object>();
-			param["connectionString"] = getConnectionString();
-			param["driver"] = getDriver();
-			param["cmd"] = "open";
-			EdgeCompiler ec = new EdgeCompiler();
-			var t = ec.CompileFunc(param);
-			var res = t.Invoke(null);
-			Task.WaitAll(res);
-			return (int) res.Result;
-		}
+        public static void close(int handler) {
+            Dictionary<string, object> param = new Dictionary<string, object>();
+            param["cmd"] = "close";
+            param["handler"] = handler;
+            param["driver"] = getDriver();
+            EdgeCompiler ec = new EdgeCompiler();
+            var t = ec.CompileFunc(param);
+            Task<object> resClose = t.Invoke(null);
+            Task.WaitAll(resClose);
+        }
 
-		void close(int handler) {
-			Dictionary<string, object> param = new Dictionary<string, object>();
-			param["cmd"] = "close";
-			param["handler"] = handler;
-			param["driver"] = getDriver();
-			EdgeCompiler ec = new EdgeCompiler();
-			var t = ec.CompileFunc(param);
-			Task<object> resClose =  t.Invoke(null);
-			Task.WaitAll(resClose);
-		}
+        public static string getConnectionString() {
+            string connName = "mySql";
+            if (System.Environment.GetEnvironmentVariable("TRAVIS") != null) {
+                connName = "travis";
+            }
+            return ConfigurationManager.ConnectionStrings[connName].ConnectionString;
+        }
 
-		string getConnectionString() {
-			string connName = "mySql";
-			if (System.Environment.GetEnvironmentVariable("TRAVIS") != null) {
-				connName = "travis";
-			}
-			return ConfigurationManager.ConnectionStrings[connName].ConnectionString;
-		}
+        public static string getDriver() {
+            string connName = "mySql";
+            if (System.Environment.GetEnvironmentVariable("TRAVIS") != null) {
+                connName = "travis";
+            }
+            return ConfigurationManager.AppSettings["driver." + connName];
+        }
 
-		string getDriver() {
-			string connName = "mySql";
-			if (System.Environment.GetEnvironmentVariable("TRAVIS") != null) {
-				connName = "travis";
-			}
-			return ConfigurationManager.AppSettings["driver." + connName];
-		}
-
-		[Test ()]
-		public void compilerExists() {
-
-			EdgeCompiler ec = new EdgeCompiler();
-			Assert.IsTrue(ec.GetType().GetMethod("CompileFunc") != null, "EdgeCompiler has CompileFunc");
-
-		}
-
-
-		[Test ()]
-		public void openConnection() {
-			Dictionary<string, object> param = new Dictionary<string, object>();
-			param["connectionString"] = getConnectionString();
-			param["driver"] = getDriver();
-			param["cmd"] = "open";
-			EdgeCompiler ec = new EdgeCompiler();
-			var t = ec.CompileFunc(param);
-			var res = t.Invoke(null);
-			Task.WaitAll(res);
-			Assert.AreEqual(res.Status, TaskStatus.RanToCompletion, "Open executed");
-			Assert.IsFalse(res.IsFaulted);
-			Assert.IsInstanceOf(typeof (int), res.Result,"Open returned an int");           
-		}
-
-		[Test ()]
-		public void openBadConnection() {
-			Dictionary<string, object> param = new Dictionary<string, object>();
-			param["connectionString"] = "bad connection";
-			param["driver"] = getDriver();
-			param["cmd"] = "open";
-			param["timeout"] = 3;
-			EdgeCompiler ec = new EdgeCompiler();
-			var t = ec.CompileFunc(param);
-			Task <object> res=null;
-			try {
-				res = t.Invoke(null);
-				Task.WaitAll(res);
-				Assert.IsFalse(res.IsFaulted,"Open bad connection should throw");
-			}
-			catch {
-				Assert.IsNotNull(res, "Open task should exist");
-				Assert.AreEqual(TaskStatus.Faulted, res.Status, "Open bad connection should throw");                
-			}
-		}
-
-		[Test ()]
-		public void closeConnection() {
-			int handler = open();
-
-			Dictionary<string, object>  param = new Dictionary<string, object>();
-			param["cmd"] = "close";
-			param["handler"] = handler;
-			param["driver"] = getDriver();
-			EdgeCompiler ec = new EdgeCompiler();
-			var t = ec.CompileFunc(param);            
-			try {
-				var resClose = t.Invoke(null);
-				Task.WaitAll(resClose);
-				Assert.IsFalse(resClose.IsFaulted, "Close connection should success");
-			}
-			catch {
-				Assert.AreEqual(true,false, "Close connection should not throw");
-			}
-
-		}
-
-		[Test ()]
-		public void setupScriptShouldExist() {
-
-			string path = Path.Combine(
-				Directory.GetParent(
-					Directory.GetParent(
-						Directory.GetCurrentDirectory()
-					).FullName
-				).FullName,
-				"setup.sql");
-			Assert.IsTrue(File.Exists(path), "setup script should be present in "+path);
-		}
-
-		[Test ()]
-		public void getDbDate() {
-			int handler = open();
-
-			Dictionary<string, object> param = new Dictionary<string, object> {
-                ["source"] = "select now()",
-				["cmd"] = "nonquery",
-				["handler"] = handler,
-				["driver"] = getDriver()
-			};
-			EdgeCompiler ec = new EdgeCompiler();
-			var t = ec.CompileFunc(param);
-		    var res = t.Invoke(null);
-		    Task.WaitAll(res);
-		    Assert.IsInstanceOf(typeof(Dictionary<string,object>), res.Result, "non query should return  a dictionary ");
-            Assert.IsTrue(((Dictionary<string, object>) res.Result).ContainsKey("rowcount"), "non query should return  a dictionary with rowcount");            
-
-            close(handler);
-		}
-
-	    void runScript(int handler, string script) {
+        public static void runScript(int handler, string script) {
             Dictionary<string, object> param = new Dictionary<string, object> {
                 ["source"] = script,
                 ["cmd"] = "nonquery",
@@ -162,16 +62,15 @@ namespace unit {
             Task.WaitAll(res);
         }
 
-        [Test()]
-        public void setupScriptShouldBeRunned() {
-            int handler = open();
+
+        public static void runFile(int handler, string scriptName) {
             string path = Path.Combine(
-                Directory.GetParent(
-                    Directory.GetParent(
-                        Directory.GetCurrentDirectory()
-                    ).FullName
-                ).FullName,
-                "setup.sql");
+                  Directory.GetParent(
+                      Directory.GetParent(
+                          Directory.GetCurrentDirectory()
+                      ).FullName
+                  ).FullName,
+                  scriptName);
             string[] all = File.ReadAllLines(path);
             string script = "";
             int i = 0;
@@ -191,19 +90,152 @@ namespace unit {
             if (script != "") {
                 runScript(handler, script);
             }
+        }
+
+
+        [SetUp]
+        public void runBeforeAnyTests() {
+            int handler = open();
+            runFile(handler, "setup.sql");
             close(handler);
+        }
+
+        [TearDown]
+        public void runAfterAnyTests() {
+            int handler = open();
+            runFile(handler, "destroy.sql");
+            close(handler);
+        }
+    }
+
+    [TestFixture()]
+	public class UnitTest1 {
+
+        [Test ()]
+		public void compilerExists() {
+
+			EdgeCompiler ec = new EdgeCompiler();
+			Assert.IsTrue(ec.GetType().GetMethod("CompileFunc") != null, "EdgeCompiler has CompileFunc");
+
+		}
+
+
+		[Test ()]
+		public void openConnection() {
+			Dictionary<string, object> param = new Dictionary<string, object>();
+			param["connectionString"] = setupDb.getConnectionString();
+			param["driver"] = setupDb.getDriver();
+			param["cmd"] = "open";
+			EdgeCompiler ec = new EdgeCompiler();
+			var t = ec.CompileFunc(param);
+			var res = t.Invoke(null);
+			Task.WaitAll(res);
+			Assert.AreEqual(res.Status, TaskStatus.RanToCompletion, "Open executed");
+			Assert.IsFalse(res.IsFaulted);
+			Assert.IsInstanceOf(typeof (int), res.Result,"Open returned an int");           
+		}
+
+		[Test ()]
+		public void openBadConnection() {
+			Dictionary<string, object> param = new Dictionary<string, object>();
+			param["connectionString"] = "bad connection";
+			param["driver"] = setupDb.getDriver();
+			param["cmd"] = "open";
+			param["timeout"] = 3;
+			EdgeCompiler ec = new EdgeCompiler();
+			var t = ec.CompileFunc(param);
+			Task <object> res=null;
+			try {
+				res = t.Invoke(null);
+				Task.WaitAll(res);
+				Assert.IsFalse(res.IsFaulted,"Open bad connection should throw");
+			}
+			catch {
+				Assert.IsNotNull(res, "Open task should exist");
+				Assert.AreEqual(TaskStatus.Faulted, res.Status, "Open bad connection should throw");                
+			}
+		}
+
+		[Test ()]
+		public void closeConnection() {
+			int handler = setupDb.open();
+
+			Dictionary<string, object>  param = new Dictionary<string, object>();
+			param["cmd"] = "close";
+			param["handler"] = handler;
+			param["driver"] = setupDb.getDriver();
+			EdgeCompiler ec = new EdgeCompiler();
+			var t = ec.CompileFunc(param);            
+			try {
+				var resClose = t.Invoke(null);
+				Task.WaitAll(resClose);
+				Assert.IsFalse(resClose.IsFaulted, "Close connection should success");
+			}
+			catch {
+				Assert.AreEqual(true,false, "Close connection should not throw");
+			}
+		    
+		}
+
+		[Test ()]
+		public void setupScriptShouldExist() {
+
+			string path = Path.Combine(
+				Directory.GetParent(
+					Directory.GetParent(
+						Directory.GetCurrentDirectory()
+					).FullName
+				).FullName,
+				"setup.sql");
+			Assert.IsTrue(File.Exists(path), "setup script should be present in "+path);
+		}
+
+		[Test ()]
+		public void getDbDate() {
+			int handler = setupDb.open();
+
+			Dictionary<string, object> param = new Dictionary<string, object> {
+                ["source"] = "select now()",
+				["cmd"] = "nonquery",
+				["handler"] = handler,
+				["driver"] = setupDb.getDriver()
+			};
+			EdgeCompiler ec = new EdgeCompiler();
+			var t = ec.CompileFunc(param);
+		    var res = t.Invoke(null);
+		    Task.WaitAll(res);
+		    Assert.IsInstanceOf(typeof(Dictionary<string,object>), res.Result, "non query should return  a dictionary ");
+            Assert.IsTrue(((Dictionary<string, object>) res.Result).ContainsKey("rowcount"), "non query should return  a dictionary with rowcount");
+
+            setupDb.close(handler);
+		}
+
+	  
+
+        [Test()]
+        public void setupScriptShouldBeRunned() {
+            int handler = setupDb.open();
+            string path = Path.Combine(
+                Directory.GetParent(
+                    Directory.GetParent(
+                        Directory.GetCurrentDirectory()
+                    ).FullName
+                ).FullName,
+                "setup.sql");
+            setupDb.runFile(handler,"setup.sql");
+            setupDb.close(handler);
             Assert.IsTrue(true, "setup Script does not throw when runned");
         }
 
         [Test()]
         public void updateSellerKind() {
-            int handler = open();
+            int handler = setupDb.open();
 
             Dictionary<string, object> param = new Dictionary<string, object> {
                 ["source"] = "update sellerkind set rnd=rnd+1;",
                 ["cmd"] = "nonquery",
                 ["handler"] = handler,
-                ["driver"] = getDriver()
+                ["driver"] = setupDb.getDriver()
             };
             EdgeCompiler ec = new EdgeCompiler();
             var t = ec.CompileFunc(param);
@@ -212,18 +244,18 @@ namespace unit {
             Dictionary<string, object> res = (Dictionary<string, object>)tRes.Result;
             Assert.AreEqual(20,res["rowcount"]);
 
-            close(handler);
+            setupDb.close(handler);
         }
 
         [Test()]
         public void selectFromCustomerKindShouldReturnDictionary() {
-            int handler = open();
+            int handler = setupDb.open();
 
             Dictionary<string, object> param = new Dictionary<string, object> {
                 ["source"] = "select * from customerkind;",
                 //["cmd"] = "nonquery",
                 ["handler"] = handler,
-                ["driver"] = getDriver()
+                ["driver"] = setupDb.getDriver()
             };
             EdgeCompiler ec = new EdgeCompiler();
             var t = ec.CompileFunc(param);
@@ -237,18 +269,18 @@ namespace unit {
             Assert.IsInstanceOf(typeof(Object[]), resultSet["meta"], "ResultSet.meta is a Object[] ");
             Assert.IsInstanceOf(typeof(List<object>), resultSet["rows"], "ResultSet.rows is a list<object> ");
 
-            close(handler);
+            setupDb.close(handler);
         }
 
         [Test()]
         public void selectFromCustomerKindMetaShouldBeArrayOfColumnNames() {
-            int handler = open();
+            int handler = setupDb.open();
 
             Dictionary<string, object> param = new Dictionary<string, object> {
                 ["source"] = "select * from customerkind;",
                 //["cmd"] = "nonquery",
                 ["handler"] = handler,
-                ["driver"] = getDriver()
+                ["driver"] = setupDb.getDriver()
             };
             EdgeCompiler ec = new EdgeCompiler();
             var t = ec.CompileFunc(param);
@@ -262,18 +294,18 @@ namespace unit {
             Assert.AreEqual(meta[2], "rnd");
             Assert.AreEqual(meta.Length, 3);
 
-            close(handler);
+            setupDb.close(handler);
         }
 
         [Test()]
         public void selectFromCustomerKindRowsShouldBeListOfObjects() {
-            int handler = open();
+            int handler = setupDb.open();
 
             Dictionary<string, object> param = new Dictionary<string, object> {
                 ["source"] = "select * from customerkind;",
                 //["cmd"] = "nonquery",
                 ["handler"] = handler,
-                ["driver"] = getDriver()
+                ["driver"] = setupDb.getDriver()
             };
             EdgeCompiler ec = new EdgeCompiler();
             var t = ec.CompileFunc(param);
@@ -290,7 +322,7 @@ namespace unit {
                 Assert.AreEqual(values[1].ToString(), "name" + (i*3));
                 Assert.IsInstanceOf(typeof(Int32),values[2]);
             }
-            close(handler);
+            setupDb.close(handler);
         }
     }
 }
