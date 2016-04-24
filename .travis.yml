@@ -1,5 +1,4 @@
 language: csharp
-solution: edge-db.sln
 before_install:
   - sudo apt-get install nunit-console
 services:
@@ -29,5 +28,7 @@ install:
   - sudo apt-get install nunit-console
   - npm install
   - xbuild edge-db.sln
+  
+script:
   - nunit-console ./unit/bin/Debug/unit.dll
   
