@@ -435,6 +435,8 @@ namespace unit {
             Task.WaitAll(tRes);
             Assert.IsInstanceOf(typeof(List<object>), tRes.Result, "query without callback should return  a List<object[]> ");
             List<object> res = (List<object>)tRes.Result;
+            Assert.AreEqual(0, res.Count, "When a callback is present, no data is returned in the main result");
+
             Assert.AreEqual(10, nCount, "Callback should be called 10 times");
             for (int i = 0; i < 10; i++) {
                 Dictionary<string, object> resSet = (Dictionary<string, object>) resultSet[i];
@@ -442,14 +444,14 @@ namespace unit {
                     Assert.IsTrue(resSet.ContainsKey("meta"), "First resultset has meta");
                 }
                 else {
-                    Assert.IsFalse(resSet.ContainsKey("meta"), "Subsequent resultsets has no meta");
+                    Assert.IsFalse(resSet.ContainsKey("meta"), "Subsequent resultsets have no meta");
                 }
 
                 if (i == 0 || i==9) {
-                    Assert.IsFalse(resSet.ContainsKey("rows"), "First and last resultset has no rows");
+                    Assert.IsFalse(resSet.ContainsKey("rows"), "First and last resultset have no rows");
                 }
                 else {
-                    Assert.IsTrue(resSet.ContainsKey("rows"), "Subsequent resultsets has rows");
+                    Assert.IsTrue(resSet.ContainsKey("rows"), "Subsequent resultsets have rows");
                     List<object> rows = (List<object>)resSet["rows"];
                     Assert.AreEqual(rows.Count, 5);
                     for (int j = 0; j < 5; j++) {
@@ -464,7 +466,79 @@ namespace unit {
                     Assert.IsTrue(resSet.ContainsKey("resolve"), "Last resultset has resolve");
                 }
                 else {
-                    Assert.IsFalse(resSet.ContainsKey("resolve"), "Other resultsets has no resolve");
+                    Assert.IsFalse(resSet.ContainsKey("resolve"), "Other resultsets have no resolve");
+                }
+            }
+
+            setupDb.close(handler);
+        }
+
+        [Test()]
+        public void doubleSelectWithCallBackAndPacketSize() {
+            int handler = setupDb.open();
+            var resultSet = new List<object>();
+            int nCount = 0;
+            var callBack = new Func<object, Task<object>>((o) => {
+                resultSet.Add(o);
+                nCount++;
+                return null;
+            });
+
+            Dictionary<string, object> param = new Dictionary<string, object> {
+                ["source"] = "select * from customerkind;select * from sellerkind;",
+                ["callback"] = callBack,
+                ["packetSize"] = 5,
+                ["handler"] = handler,
+                ["driver"] = setupDb.getDriver()
+            };
+            EdgeCompiler ec = new EdgeCompiler();
+            var t = ec.CompileFunc(param);
+            var tRes = t.Invoke(null);
+            Task.WaitAll(tRes);
+            Assert.IsInstanceOf(typeof(List<object>), tRes.Result, "query without callback should return  a List<object[]> ");
+            List<object> res = (List<object>)tRes.Result;
+            Assert.AreEqual(0, res.Count, "When a callback is present, no data is returned in the main result");
+            //9 times for customerkind (1meta + 40 rows=5*8) and  5 times for sellerkind (1 meta + 20 rows = 5*4) + 1 "resolve"
+            Assert.AreEqual(15, nCount, "Callback should be called 10 times");
+            for (int i = 0; i < 15; i++) {
+                Dictionary<string, object> resSet = (Dictionary<string, object>)resultSet[i];
+                if (i == 0 || i== 9) {
+                    Assert.IsTrue(resSet.ContainsKey("meta"), "First resultset has meta");
+                }
+                else {
+                    Assert.IsFalse(resSet.ContainsKey("meta"), "other resultsets have no meta");
+                }
+
+                if (i == 0 || i == 9 || i==14) {
+                    Assert.IsFalse(resSet.ContainsKey("rows"), "Where there is meta o resolve there is no row");
+                }
+                else {
+                    Assert.IsTrue(resSet.ContainsKey("rows"), "Subsequent resultsets have rows");
+                    List<object> rows = (List<object>)resSet["rows"];
+                    Assert.AreEqual(rows.Count, 5);
+                    if (i < 9) {
+                        for (int j = 0; j < 5; j++) {
+                            Object[] values = (Object[]) rows[j];
+                            Assert.AreEqual(((i - 1)*5 + j)*3, values[0]);
+                            Assert.AreEqual("name" + (((i - 1)*5 + j)*3), values[1].ToString());
+                            Assert.IsInstanceOf(typeof(Int32), values[2]);
+                        }
+                    }
+                    else {
+                        for (int j = 0; j < 5; j++) {
+                            Object[] values = (Object[])rows[j];
+                            Assert.AreEqual(((i - 10) * 5 + j) * 30, values[0]);
+                            Assert.AreEqual("name" + (((i - 10) * 5 + j) * 30), values[1].ToString());
+                            Assert.IsInstanceOf(typeof(Int32), values[2]);
+                        }
+                    }
+                }
+
+                if (i == 14) {
+                    Assert.IsTrue(resSet.ContainsKey("resolve"), "Last resultset has resolve");
+                }
+                else {
+                    Assert.IsFalse(resSet.ContainsKey("resolve"), "Other resultsets have no resolve");
                 }
             }
 
