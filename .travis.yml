@@ -1,6 +1,8 @@
 language: csharp
+solution: edge-db.sln
 before_install:
   - sudo apt-get install nunit-console
+dist:   xenial
 services:
     - mysql
 env:
@@ -27,8 +29,8 @@ install:
   #- sudo apt-get install mono-devel
   #- sudo apt-get install nunit-console
   - npm install
-  - xbuild edge-db.sln
-  
+  #- xbuild edge-db.sln
+  - msbuild edge-db.sln
 script:
   - nunit-console ./unit/bin/Debug/unit.dll
   

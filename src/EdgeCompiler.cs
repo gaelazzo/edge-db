@@ -374,8 +374,8 @@ public class sqlServerConn : genericConnection {
 			try {
 				await connection.OpenAsync();
 				return true;
-			} catch  {
-				throw new Exception ("Error opening connection");
+			} catch (Exception E)  {
+				throw new Exception ("Error opening connection:"+E.ToString());
 			}
 		}
 
