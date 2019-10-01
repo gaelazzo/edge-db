@@ -30,7 +30,7 @@ install:
   #- sudo apt-get install mono-devel
   #- sudo apt-get install nunit-console
   - nuget restore edge-db.sln
-  - nuget install NUnit.Console -Version 3.9.0  -bin/Debug testrunner
+  - nuget install NUnit.Console -Version 3.9.0  -OutputDirectory  testrunner
   #- npm install
   #- xbuild edge-db.sln
 
