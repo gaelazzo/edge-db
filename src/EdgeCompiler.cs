@@ -213,7 +213,7 @@ public abstract class genericConnection {
     public abstract Task<object> executeNonQueryConn(string commandString, int timeOut);
 
     /// <summary>
-    /// Opens the connection. This is meant to be used in cojunction with a series of executeQuery calls. 
+    /// Opens the connection. This is meant to be used in conjunction with a series of executeQuery calls.
     /// </summary>
     /// <returns></returns>
     public abstract Task<object> open();
@@ -275,7 +275,6 @@ public class sqlServerConn : genericConnection {
 		void addParameters (SqlCommand command, IDictionary<string, object> parameters) {
 			if (parameters != null) {
 				foreach (KeyValuePair<string, object> parameter in parameters) {
-
 					command.Parameters.AddWithValue (parameter.Key, parameter.Value ?? DBNull.Value);
 				}
 			}
@@ -483,7 +482,7 @@ public class sqlServerConn : genericConnection {
 			if (callback != null) {
 				var res = new Dictionary<string, object> ();
 				res ["resolve"] = 1;
-				callback (res);
+				 callback (res);
 			}
 			return rows; 
 		}

@@ -369,7 +369,7 @@ namespace unit {
             var callBack = new Func<object, Task<object>>((o) => {
                 resultSet.Add(o);
                 nCount++;
-                return null;
+                return Task.FromResult<object>(null);
             });
 
             Dictionary<string, object> param = new Dictionary<string, object> {
@@ -419,7 +419,7 @@ namespace unit {
             var callBack = new Func<object, Task<object>>((o) => {
                 resultSet.Add(o);
                 nCount++;
-                return null;
+                return Task.FromResult<object>(null);
             });
 
             Dictionary<string, object> param = new Dictionary<string, object> {
@@ -481,7 +481,7 @@ namespace unit {
             var callBack = new Func<object, Task<object>>((o) => {
                 resultSet.Add(o);
                 nCount++;
-                return null;
+                return Task.FromResult<object>(null);
             });
 
             Dictionary<string, object> param = new Dictionary<string, object> {
