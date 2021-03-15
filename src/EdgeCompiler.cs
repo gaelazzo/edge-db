@@ -257,7 +257,13 @@ public class sqlServerConn : genericConnection {
 
 		public override  async Task<object> executeQueryConn (string commandString,
 		                                                 int packetSize, int timeout, Func<object, Task<object>> callback = null) {
-			return await internalExecuteQuery (connection, commandString, packetSize, timeout, callback);
+            if (callback == null) {
+				return await internalExecuteQuery (connection, commandString, packetSize, timeout, callback);
+            }
+
+            Task.Factory.StartNew(() => internalExecuteQuery(connection, commandString, packetSize, timeout, callback));
+            return Task.FromResult((object)null); 
+			//return 
 		}
 
 		public override async Task<object> executeNonQuery (string commandString, int timeOut) {
@@ -323,7 +329,7 @@ public class sqlServerConn : genericConnection {
 							}
 							localRows.Add (resultRecord);
 							if (packetSize > 0 && localRows.Count == packetSize && callback != null) {
-								callback (res);
+                                 callback (res);
 								localRows = new List<object> ();
 								res = new Dictionary<string, object> ();
 								res ["rows"] = localRows;
@@ -332,7 +338,7 @@ public class sqlServerConn : genericConnection {
 
 						if (callback != null) {
 							if (localRows.Count > 0) {
-								callback (res);
+                                 callback (res);
 							}
 						} else {
 							rows.Add (res);
@@ -344,7 +350,7 @@ public class sqlServerConn : genericConnection {
 			if (callback != null) {
 				var res = new Dictionary<string, object> ();
 				res ["resolve"] = 1;
-				callback (res);
+                callback (res);
 			}
 			return rows;
 		}
@@ -393,7 +399,12 @@ public class sqlServerConn : genericConnection {
 
 		public override async Task<object> executeQueryConn (string commandString,
 		                                                int packetSize, int timeout, Func<object, Task<object>> callback = null) {
-			return await internalExecuteQuery (connection, commandString, packetSize, timeout, callback);        
+
+            if (callback == null) {
+                return await internalExecuteQuery (connection, commandString, packetSize, timeout, callback);
+            }
+            Task.Factory.StartNew(() => internalExecuteQuery(connection, commandString, packetSize, timeout, callback));
+			return Task.FromResult((object)null); 
 		}
 
 
@@ -461,7 +472,7 @@ public class sqlServerConn : genericConnection {
 							}
 							localRows.Add (resultRecord);
 							if (packetSize > 0 && localRows.Count == packetSize && callback != null) {
-								callback (res);
+                                callback (res);
 								localRows = new List<object> ();
 								res = new Dictionary<string, object> ();
 								res ["rows"] = localRows;
@@ -470,7 +481,7 @@ public class sqlServerConn : genericConnection {
 
 						if (callback != null) {
 							if (localRows.Count > 0) {
-								callback (res);
+                                callback (res);
 							}
 						} else {
 							rows.Add (res);
@@ -482,7 +493,7 @@ public class sqlServerConn : genericConnection {
 			if (callback != null) {
 				var res = new Dictionary<string, object> ();
 				res ["resolve"] = 1;
-				 callback (res);
+                callback (res);
 			}
 			return rows; 
 		}
