@@ -366,7 +366,7 @@ public class sqlServerConn : genericConnection {
 		}
 	}
 
-	public class mySqlConn : genericConnection {
+public class mySqlConn : genericConnection {
 		private MySqlConnection connection;
 		private string connectionString;
 
@@ -444,7 +444,7 @@ public class sqlServerConn : genericConnection {
 						res = new Dictionary<string, object> ();
 						List<object> localRows = new List<object> ();
 						res ["meta"] = fieldNames;
-						if (callback != null) {
+						if (callback != null && packetSize>0) {
 							callback (res);   //Call is voluntarily NOT awaited. So processing can be done while this thread keeps reading.              
 							res = new Dictionary<string, object> ();
 						}
