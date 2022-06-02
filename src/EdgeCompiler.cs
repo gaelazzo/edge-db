@@ -302,7 +302,7 @@ public class sqlServerConn : genericConnection {
 						List<object> localRows = new List<object> ();
 						res ["meta"] = fieldNames;
 						if (callback != null && packetSize>0) {
-							callback (res);
+							await callback(res);
 							res = new Dictionary<string, object> ();
 						}
 
@@ -329,7 +329,7 @@ public class sqlServerConn : genericConnection {
 							}
 							localRows.Add (resultRecord);
 							if (packetSize > 0 && localRows.Count == packetSize && callback != null) {
-                                 callback (res);
+								await callback(res);
 								localRows = new List<object> ();
 								res = new Dictionary<string, object> ();
 								res ["rows"] = localRows;
@@ -338,7 +338,7 @@ public class sqlServerConn : genericConnection {
 
 						if (callback != null) {
 							if (localRows.Count > 0) {
-                                 callback (res);
+                                 await callback (res);
 							}
 						} else {
 							rows.Add (res);
@@ -350,7 +350,7 @@ public class sqlServerConn : genericConnection {
 			if (callback != null) {
 				var res = new Dictionary<string, object> ();
 				res ["resolve"] = 1;
-                callback (res);
+                await callback (res);
 			}
 			return rows;
 		}
@@ -445,7 +445,7 @@ public class mySqlConn : genericConnection {
 						List<object> localRows = new List<object> ();
 						res ["meta"] = fieldNames;
 						if (callback != null && packetSize>0) {
-							callback (res);   //Call is voluntarily NOT awaited. So processing can be done while this thread keeps reading.              
+							await callback (res);   //Call is voluntarily NOT awaited. So processing can be done while this thread keeps reading.              
 							res = new Dictionary<string, object> ();
 						}
 
@@ -472,7 +472,7 @@ public class mySqlConn : genericConnection {
 							}
 							localRows.Add (resultRecord);
 							if (packetSize > 0 && localRows.Count == packetSize && callback != null) {
-                                callback (res);
+                                await callback (res);
 								localRows = new List<object> ();
 								res = new Dictionary<string, object> ();
 								res ["rows"] = localRows;
@@ -481,7 +481,7 @@ public class mySqlConn : genericConnection {
 
 						if (callback != null) {
 							if (localRows.Count > 0) {
-                                callback (res);
+                                await callback (res);
 							}
 						} else {
 							rows.Add (res);
@@ -493,7 +493,7 @@ public class mySqlConn : genericConnection {
 			if (callback != null) {
 				var res = new Dictionary<string, object> ();
 				res ["resolve"] = 1;
-                callback (res);
+                await callback (res);
 			}
 			return rows; 
 		}
