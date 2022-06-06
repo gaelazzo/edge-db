@@ -130,8 +130,8 @@ using MySql.Data.MySqlClient;
                 await gen.open();
                 return AddConnection(gen);
             }
-            catch {
-                throw new Exception("Error opening connection");
+            catch (Exception E){
+                throw new Exception($"Error opening connection {E.ToString()}");
             }
 
 
@@ -303,7 +303,7 @@ public class sqlServerConn : genericConnection {
 						res ["meta"] = fieldNames;
 						if (callback != null && packetSize>0) {
 							await callback(res);
-							res = new Dictionary<string, object> ();
+							res = new Dictionary<string, object> ();//only if packetized, sends a "meta" alone
 						}
 
 						res ["rows"] = localRows;
@@ -332,16 +332,17 @@ public class sqlServerConn : genericConnection {
 								await callback(res);
 								localRows = new List<object> ();
 								res = new Dictionary<string, object> ();
-								res ["rows"] = localRows;
+								res ["rows"] = localRows;	//only if packetized, sends a "row" alone if n.row reaches packet size
 							}
 						}
 
 						if (callback != null) {
 							if (localRows.Count > 0) {
-                                 await callback (res);
+                                 await callback (res); //sends res with meta or only with rows (if not first packet of that set)
 							}
-						} else {
-							rows.Add (res);
+						} 
+						else {
+							rows.Add (res); //if ther is not callback, result will be sent alltogether
 						}
 					} while (await reader.NextResultAsync ());
 
