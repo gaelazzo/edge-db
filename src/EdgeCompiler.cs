@@ -9,26 +9,27 @@ using MySql.Data.MySqlClient;
 
     public class EdgeCompiler {
         private static Dictionary<int, genericConnection> allConn = new Dictionary<int, genericConnection>();
-        private static int nConn = 0;
-        private static int totConn = 0;
-
+		private static Random Rn = new Random(DateTime.Now.Millisecond);
+		
+		static int getNewId() {
+			int i = Rn.Next(10000000);
+			while(allConn.ContainsKey(i)) i = Rn.Next(10000000);
+			return i;
+		}
         private static int AddConnection(genericConnection sqlConn) {
             lock (allConn) {
-                nConn += 1;
-                totConn += 1;
-                allConn[nConn] = sqlConn;
-                return nConn;
+				var handler = getNewId();
+				allConn[handler] = sqlConn;
+                return handler;
             }
         }
 
         private static void RemoveConnection(int handler) {
             lock (allConn) {
-                allConn[handler] = null;
-                totConn -= 1;
-                if (totConn == 0) {
-                    nConn = 0;
-                    allConn.Clear();
-                }
+				if (!allConn.ContainsKey(handler)) return;
+				var sqlConn = allConn[handler];
+				allConn.Remove(handler);
+                if (sqlConn!=null)sqlConn.close();
             }
         }
 
@@ -85,9 +86,10 @@ using MySql.Data.MySqlClient;
                         };
                     }
                     else {
-                        genericConnection conn = dispatchConn(connectionString, driver);
+                       
                         return async (o) => {
-                            return await conn.executeNonQuery(command, timeOut);
+							genericConnection conn = dispatchConn(connectionString, driver);
+							return await conn.executeNonQuery(command, timeOut);
                         };
                     }
                 }
@@ -237,23 +239,27 @@ public class sqlServerConn : genericConnection {
 			try {
 				await connection.OpenAsync ();
 				return true;
-			} catch {
-				throw new Exception ("Error opening connection");
-			}
 		}
+		catch (Exception E) {
+			throw new Exception("Error opening connection:" + E.ToString());
+		}
+	}
 
 		public override void close () {
 			connection.Close ();
 		}
 
-		public override async Task<object> executeQuery (string commandString, IDictionary<string, object> parameters,
-		                                                  int packetSize, int timeout, Func<object, Task<object>> callback = null) {
+	public override async Task<object> executeQuery(string commandString, IDictionary<string, object> parameters,
+													  int packetSize, int timeout, Func<object, Task<object>> callback = null) {
 
-			using (SqlConnection tempConn = new SqlConnection (connectionString)) {
-				await tempConn.OpenAsync ();
-				return await internalExecuteQuery (tempConn, commandString, packetSize, timeout, callback);
-			}
+		using (SqlConnection tempConn = new SqlConnection(connectionString)) {
+			await tempConn.OpenAsync();
+			return await internalExecuteQuery(tempConn, commandString, packetSize, timeout, callback);
 		}
+
+		
+	}
+	
 
 		public override  async Task<object> executeQueryConn (string commandString,
 		                                                 int packetSize, int timeout, Func<object, Task<object>> callback = null) {
@@ -261,9 +267,11 @@ public class sqlServerConn : genericConnection {
 				return await internalExecuteQuery (connection, commandString, packetSize, timeout, callback);
             }
 
-            Task.Factory.StartNew(() => internalExecuteQuery(connection, commandString, packetSize, timeout, callback));
-            return Task.FromResult((object)null); 
-			//return 
+            //Task.Factory.StartNew(() => internalExecuteQuery(connection, commandString, packetSize, timeout, callback));
+            //return Task.FromResult((object)null); 
+			
+		
+			return await internalExecuteQuery(connection, commandString, packetSize, timeout, callback);
 		}
 
 		public override async Task<object> executeNonQuery (string commandString, int timeOut) {
@@ -286,75 +294,91 @@ public class sqlServerConn : genericConnection {
 			}
 		}
 
-		private async Task<object> internalExecuteQuery (SqlConnection connection, string commandString,
-		                                      int packetSize, int timeout, Func<object, Task<object>> callback = null) {
-			List<object> rows = new List<object> ();
-			using (SqlCommand command = new SqlCommand (commandString, connection)) {
-				using (var reader = await command.ExecuteReaderAsync (CommandBehavior.Default)) {
+	private async Task<object> internalExecuteQuery(SqlConnection connection, string commandString,
+										  int packetSize, int timeout, Func<object, Task<object>> callback = null) {
+		try {
+			List<object> rows = new List<object>();
+			using (SqlCommand command = new SqlCommand(commandString, connection)) {
+				using (var reader = await command.ExecuteReaderAsync(CommandBehavior.Default)) {
 					do {
 						Dictionary<string, object> res;
 						object[] fieldNames = new object[reader.FieldCount];
 						for (int i = 0; i < reader.FieldCount; i++) {
-							fieldNames [i] = reader.GetName (i);
+							fieldNames[i] = reader.GetName(i);
 						}
 						//rows.Add(fieldNames);
-						res = new Dictionary<string, object> ();
-						List<object> localRows = new List<object> ();
-						res ["meta"] = fieldNames;
-						if (callback != null && packetSize>0) {
+						res = new Dictionary<string, object>();
+						List<object> localRows = new List<object>();
+						res["meta"] = fieldNames;
+						if (callback != null && packetSize > 0) {
 							await callback(res);
-							res = new Dictionary<string, object> ();//only if packetized, sends a "meta" alone
+							res = new Dictionary<string, object>();//only if packetized, sends a "meta" alone
 						}
 
-						res ["rows"] = localRows;
+						res["rows"] = localRows;
 						IDataRecord record = (IDataRecord)reader;
-						while (reader.Read ()) {
+						while (reader.Read()) {
 							object[] resultRecord = new object[record.FieldCount];
-							record.GetValues (resultRecord);
+							record.GetValues(resultRecord);
 							for (int i = 0; i < record.FieldCount; i++) {
-								Type type = record.GetFieldType (i);
-								if (resultRecord [i] is System.DBNull) {
-									resultRecord [i] = null;
-								} else if (type == typeof(Int16) || type == typeof(UInt16)) {
-										resultRecord [i] = Convert.ToInt32 (resultRecord [i]);
-									} else if (type == typeof(Decimal)) {
-											resultRecord [i] = Convert.ToDouble (resultRecord [i]);
-										} else if (type == typeof(byte[]) || type == typeof(char[])) {
-												resultRecord [i] = Convert.ToBase64String ((byte[])resultRecord [i]);
-											} else if (type == typeof(Guid)) { //|| type == typeof(DateTime)
-													resultRecord [i] = resultRecord [i].ToString ();
-												} else if (type == typeof(IDataReader)) {
-														resultRecord [i] = "<IDataReader>";
-													}
+								Type type = record.GetFieldType(i);
+								if (resultRecord[i] is System.DBNull) {
+									resultRecord[i] = null;
+								}
+								else if (type == typeof(Int16) || type == typeof(UInt16)) {
+									resultRecord[i] = Convert.ToInt32(resultRecord[i]);
+								}
+								else if (type == typeof(Decimal)) {
+									resultRecord[i] = Convert.ToDouble(resultRecord[i]);
+								}
+								else if (type == typeof(byte[]) || type == typeof(char[])) {
+									resultRecord[i] = Convert.ToBase64String((byte[])resultRecord[i]);
+								}
+								else if (type == typeof(Guid)) { //|| type == typeof(DateTime)
+									resultRecord[i] = resultRecord[i].ToString();
+								}
+								else if (type == typeof(IDataReader)) {
+									resultRecord[i] = "<IDataReader>";
+								}
 							}
-							localRows.Add (resultRecord);
+							localRows.Add(resultRecord);
 							if (packetSize > 0 && localRows.Count == packetSize && callback != null) {
 								await callback(res);
-								localRows = new List<object> ();
-								res = new Dictionary<string, object> ();
-								res ["rows"] = localRows;	//only if packetized, sends a "row" alone if n.row reaches packet size
+								localRows = new List<object>();
+								res = new Dictionary<string, object>();
+								res["rows"] = localRows;    //only if packetized, sends a "row" alone if n.row reaches packet size
 							}
 						}
 
 						if (callback != null) {
 							if (localRows.Count > 0) {
-                                 await callback (res); //sends res with meta or only with rows (if not first packet of that set)
+								await callback(res); //sends res with meta or only with rows (if not first packet of that set)
 							}
-						} 
-						else {
-							rows.Add (res); //if ther is not callback, result will be sent alltogether
 						}
-					} while (await reader.NextResultAsync ());
+						else {
+							rows.Add(res); //if ther is not callback, result will be sent alltogether
+						}
+					} while (await reader.NextResultAsync());
 
 				}
 			}
 			if (callback != null) {
-				var res = new Dictionary<string, object> ();
-				res ["resolve"] = 1;
-                await callback (res);
+				var res = new Dictionary<string, object>();
+				res["resolve"] = 1;
+				await callback(res);
 			}
 			return rows;
 		}
+		catch (Exception ex) {
+			var res = new Dictionary<string, object>();
+			res["error"] = ex.ToString();
+			if (callback != null) {
+				await callback(res);
+				return null;
+			}
+			return res;
+		}
+	}
 
 		private async Task<object> internalExecuteNonQuery (SqlConnection connection, string commandString, int timeOut) {
 			SqlCommand command = new SqlCommand (commandString, connection);
@@ -404,7 +428,7 @@ public class mySqlConn : genericConnection {
             if (callback == null) {
                 return await internalExecuteQuery (connection, commandString, packetSize, timeout, callback);
             }
-            Task.Factory.StartNew(() => internalExecuteQuery(connection, commandString, packetSize, timeout, callback));
+            Task.Factory.StartNew(() =>  internalExecuteQuery(connection, commandString, packetSize, timeout, callback));
 			return Task.FromResult((object)null); 
 		}
 
@@ -430,74 +454,91 @@ public class mySqlConn : genericConnection {
 			}
 		}
 
-		private async Task<object> internalExecuteQuery (MySqlConnection connection, string commandString,
-		                                      int packetSize, int timeout, Func<object, Task<object>> callback = null) {
-			List<object> rows = new List<object> ();
-			using (MySqlCommand command = new MySqlCommand (commandString, connection)) {
-				using (DbDataReader reader = await command.ExecuteReaderAsync (CommandBehavior.Default)) {
+	private async Task<object> internalExecuteQuery(MySqlConnection connection, string commandString,
+										  int packetSize, int timeout, Func<object, Task<object>> callback = null) {
+		try {
+			List<object> rows = new List<object>();
+			using (MySqlCommand command = new MySqlCommand(commandString, connection)) {
+				using (DbDataReader reader = await command.ExecuteReaderAsync(CommandBehavior.Default)) {
 					do {
 						Dictionary<string, object> res;
 						object[] fieldNames = new object[reader.FieldCount];
 						for (int i = 0; i < reader.FieldCount; i++) {
-							fieldNames [i] = reader.GetName (i);
+							fieldNames[i] = reader.GetName(i);
 						}
 						//rows.Add(fieldNames);
-						res = new Dictionary<string, object> ();
-						List<object> localRows = new List<object> ();
-						res ["meta"] = fieldNames;
-						if (callback != null && packetSize>0) {
-							await callback (res);   //Call is voluntarily NOT awaited. So processing can be done while this thread keeps reading.              
-							res = new Dictionary<string, object> ();
+						res = new Dictionary<string, object>();
+						List<object> localRows = new List<object>();
+						res["meta"] = fieldNames;
+						if (callback != null && packetSize > 0) {
+							await callback(res);   //Call is voluntarily NOT awaited. So processing can be done while this thread keeps reading.              
+							res = new Dictionary<string, object>();
 						}
 
-						res ["rows"] = localRows;
+						res["rows"] = localRows;
 						IDataRecord record = (IDataRecord)reader;
-						while (reader.Read ()) {
+						while (reader.Read()) {
 							object[] resultRecord = new object[record.FieldCount];
-							record.GetValues (resultRecord);
+							record.GetValues(resultRecord);
 							for (int i = 0; i < record.FieldCount; i++) {
-								Type type = record.GetFieldType (i);
-								if (resultRecord [i] is System.DBNull) {
-									resultRecord [i] = null;
-								} else if (type == typeof(Int16) || type == typeof(UInt16)) {
-										resultRecord [i] = Convert.ToInt32 (resultRecord [i]);
-									} else if (type == typeof(Decimal)) {
-											resultRecord [i] = Convert.ToDouble (resultRecord [i]);
-										} else if (type == typeof(byte[]) || type == typeof(char[])) {
-												resultRecord [i] = Convert.ToBase64String ((byte[])resultRecord [i]);
-											} else if (type == typeof(Guid)) { //|| type == typeof(DateTime)
-													resultRecord [i] = resultRecord [i].ToString ();
-												} else if (type == typeof(IDataReader)) {
-														resultRecord [i] = "<IDataReader>";
-													}
+								Type type = record.GetFieldType(i);
+								if (resultRecord[i] is System.DBNull) {
+									resultRecord[i] = null;
+								}
+								else if (type == typeof(Int16) || type == typeof(UInt16)) {
+									resultRecord[i] = Convert.ToInt32(resultRecord[i]);
+								}
+								else if (type == typeof(Decimal)) {
+									resultRecord[i] = Convert.ToDouble(resultRecord[i]);
+								}
+								else if (type == typeof(byte[]) || type == typeof(char[])) {
+									resultRecord[i] = Convert.ToBase64String((byte[])resultRecord[i]);
+								}
+								else if (type == typeof(Guid)) { //|| type == typeof(DateTime)
+									resultRecord[i] = resultRecord[i].ToString();
+								}
+								else if (type == typeof(IDataReader)) {
+									resultRecord[i] = "<IDataReader>";
+								}
 							}
-							localRows.Add (resultRecord);
+							localRows.Add(resultRecord);
 							if (packetSize > 0 && localRows.Count == packetSize && callback != null) {
-                                await callback (res);
-								localRows = new List<object> ();
-								res = new Dictionary<string, object> ();
-								res ["rows"] = localRows;
+								await callback(res);
+								localRows = new List<object>();
+								res = new Dictionary<string, object>();
+								res["rows"] = localRows;
 							}
 						}
 
 						if (callback != null) {
 							if (localRows.Count > 0) {
-                                await callback (res);
+								await callback(res);
 							}
-						} else {
-							rows.Add (res);
 						}
-					} while (await reader.NextResultAsync ());
+						else {
+							rows.Add(res);
+						}
+					} while (await reader.NextResultAsync());
 
 				}
 			}
 			if (callback != null) {
-				var res = new Dictionary<string, object> ();
-				res ["resolve"] = 1;
-                await callback (res);
+				var res = new Dictionary<string, object>();
+				res["resolve"] = 1;
+				await callback(res);
 			}
-			return rows; 
+			return rows;
 		}
+		catch (Exception ex) {
+			var res = new Dictionary<string, object>();
+			res["error"] = ex.ToString();
+			if (callback != null) {
+				await callback(res);
+				return null;
+			}
+			return res;			
+		}
+	}
 
 		private async Task<object> internalExecuteNonQuery (MySqlConnection connection, string commandString, int timeOut) {
 			MySqlCommand command = new MySqlCommand (commandString, connection);
