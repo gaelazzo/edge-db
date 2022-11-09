@@ -299,6 +299,7 @@ public class sqlServerConn : genericConnection {
 		try {
 			List<object> rows = new List<object>();
 			using (SqlCommand command = new SqlCommand(commandString, connection)) {
+				command.CommandTimeout = timeout;
 				using (var reader = await command.ExecuteReaderAsync(CommandBehavior.Default)) {
 					do {
 						Dictionary<string, object> res;
@@ -459,6 +460,7 @@ public class mySqlConn : genericConnection {
 		try {
 			List<object> rows = new List<object>();
 			using (MySqlCommand command = new MySqlCommand(commandString, connection)) {
+				command.CommandTimeout = timeout;
 				using (DbDataReader reader = await command.ExecuteReaderAsync(CommandBehavior.Default)) {
 					do {
 						Dictionary<string, object> res;
