@@ -384,28 +384,23 @@ namespace unit {
             Task.WaitAll(tRes);
             Assert.IsInstanceOf(typeof(List<object>), tRes.Result, "query without callback should return  a List<object[]> ");
             List<object> res = (List<object>)tRes.Result;
-            Assert.AreEqual(3, nCount,"Callback should be called 3 times");
+            Assert.AreEqual(2, nCount,"Callback should be called 2 times");
             Assert.IsAssignableFrom(typeof(Dictionary<string, object>), resultSet[0]);
             Assert.IsAssignableFrom(typeof(Dictionary<string, object>), resultSet[1]);
-            Assert.IsAssignableFrom(typeof(Dictionary<string, object>), resultSet[2]);
 
             Dictionary<string, object> resSet1 = (Dictionary<string, object>) resultSet[0];
             Dictionary<string, object> resSet2 = (Dictionary<string, object>)resultSet[1];
-            Dictionary<string, object> resSet3 = (Dictionary<string, object>)resultSet[2];
 
 
             Assert.IsTrue(resSet1.ContainsKey("meta"), "First resultset has meta");
             Assert.IsFalse(resSet2.ContainsKey("meta"), "Second resultset has no meta");
-            Assert.IsFalse(resSet3.ContainsKey("meta"), "Third resultset has no meta");
 
-            Assert.IsFalse(resSet1.ContainsKey("rows"), "First resultset has no rows");
-            Assert.IsTrue(resSet2.ContainsKey("rows"), "Second resultset has rows");
-            Assert.AreEqual(6, ((List<object>) resSet2["rows"]).Count, "Second resultset has 6 rows");
-            Assert.IsFalse(resSet3.ContainsKey("rows"), "Third resultset has no rows");
+            Assert.IsTrue(resSet1.ContainsKey("rows"), "First resultset has rows");
+            Assert.AreEqual(6, ((List<object>) resSet1["rows"]).Count, "First resultset has 6 rows");
+            Assert.IsFalse(resSet2.ContainsKey("rows"), "Second resultset has no rows");
 
-            Assert.IsFalse(resSet1.ContainsKey("resolve"), "First resultset has no resolve");
-            Assert.IsFalse(resSet2.ContainsKey("resolve"), "Second resultset has no resolve");
-            Assert.IsTrue(resSet3.ContainsKey("resolve"), "Third resultset has resolve");
+            Assert.IsFalse(resSet1.ContainsKey("resolve"), "First resultset has no resolve");        
+            Assert.IsTrue(resSet2.ContainsKey("resolve"), "Second resultset has resolve");
 
             setupDb.close(handler);
         }
@@ -495,7 +490,8 @@ namespace unit {
             var t = ec.CompileFunc(param);
             var tRes = t.Invoke(null);
             Task.WaitAll(tRes);
-            Assert.IsInstanceOf(typeof(List<object>), tRes.Result, "query without callback should return  a List<object[]> ");
+            //Assert.IsNull(((Task<object>)(tRes.Result)).Result,"query with a callback should return null");
+            Assert.IsInstanceOf(typeof(List<object>), tRes.Result, "query with callback should return  a List<object[]> ");
             List<object> res = (List<object>)tRes.Result;
             Assert.AreEqual(0, res.Count, "When a callback is present, no data is returned in the main result");
             //9 times for customerkind (1meta + 40 rows=5*8) and  5 times for sellerkind (1 meta + 20 rows = 5*4) + 1 "resolve"

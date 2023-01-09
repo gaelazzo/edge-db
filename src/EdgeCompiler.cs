@@ -425,8 +425,10 @@ public class mySqlConn :genericConnection {
         if (callback == null) {
             return await internalExecuteQuery(connection, commandString, packetSize, timeout, callback);
         }
-        Task.Factory.StartNew(() => internalExecuteQuery(connection, commandString, packetSize, timeout, callback));
-        return Task.FromResult((object)null);
+        //Task.Factory.StartNew(() => internalExecuteQuery(connection, commandString, packetSize, timeout, callback));
+        //return Task.FromResult((object)null);
+
+        return await internalExecuteQuery(connection, commandString, packetSize, timeout, callback);
     }
 
 

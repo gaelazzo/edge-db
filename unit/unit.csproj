@@ -53,4 +53,7 @@
       <Name>edge-db</Name>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="destroy.sql" />
+  </ItemGroup>
 </Project>
