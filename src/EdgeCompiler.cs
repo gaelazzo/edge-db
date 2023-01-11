@@ -10,145 +10,145 @@ using Oracle.ManagedDataAccess.Client;
 public class EdgeCompiler {
 	private static Dictionary<int, genericConnection> allConn = new Dictionary<int, genericConnection>();
 	private static Random Rn = new Random(DateTime.Now.Millisecond);
-		
+
 	static int getNewId() {
 		int i = Rn.Next(10000000);
 		while (allConn.ContainsKey(i))
 			i = Rn.Next(10000000);
 		return i;
 	}
-    private static int AddConnection(genericConnection sqlConn) {
-        lock (allConn) {
+	private static int AddConnection(genericConnection sqlConn) {
+		lock (allConn) {
 			var handler = getNewId();
 			allConn[handler] = sqlConn;
-            return handler;
-        }
-    }
+			return handler;
+		}
+	}
 
-    private static void RemoveConnection(int handler) {
-        lock (allConn) {
+	private static void RemoveConnection(int handler) {
+		lock (allConn) {
 			if (!allConn.ContainsKey(handler))
 				return;
 			var sqlConn = allConn[handler];
 			allConn.Remove(handler);
-            if (sqlConn != null)
+			if (sqlConn != null)
 				sqlConn.close();
-        }
-    }
+		}
+	}
 
-    public Func<object, Task<object>> CompileFunc(IDictionary<string, object> parameters) {
-        string connectionString = Environment.GetEnvironmentVariable("EDGE_SQL_CONNECTION_STRING");
-        object tmp;
-        if (parameters.TryGetValue("connectionString", out tmp)) {
-            connectionString = (string)tmp;
-        }
-        int handler = -1;
-        if (parameters.TryGetValue("handler", out tmp)) {
-            handler = (int)tmp;
-        }
-        int timeOut = 30;
-        if (parameters.TryGetValue("timeout", out tmp)) {
-            timeOut = (int)tmp;
-        }
+	public Func<object, Task<object>> CompileFunc(IDictionary<string, object> parameters) {
+		string connectionString = Environment.GetEnvironmentVariable("EDGE_SQL_CONNECTION_STRING");
+		object tmp;
+		if (parameters.TryGetValue("connectionString", out tmp)) {
+			connectionString = (string)tmp;
+		}
+		int handler = -1;
+		if (parameters.TryGetValue("handler", out tmp)) {
+			handler = (int)tmp;
+		}
+		int timeOut = 30;
+		if (parameters.TryGetValue("timeout", out tmp)) {
+			timeOut = (int)tmp;
+		}
 
-        Func<object, Task<object>> callback = null;
-        tmp = null;
-        if (parameters.TryGetValue("callback", out tmp)) {
-            callback = (Func<object, Task<object>>)tmp;
-        }
-        string driver = "sqlServer";
-        tmp = null;
-        if (parameters.TryGetValue("driver", out tmp)) {
-            driver = (string)tmp;
-        }
+		Func<object, Task<object>> callback = null;
+		tmp = null;
+		if (parameters.TryGetValue("callback", out tmp)) {
+			callback = (Func<object, Task<object>>)tmp;
+		}
+		string driver = "sqlServer";
+		tmp = null;
+		if (parameters.TryGetValue("driver", out tmp)) {
+			driver = (string)tmp;
+		}
 
-        string command = "";
-        if (parameters.TryGetValue("source", out tmp)) {
-            command = tmp.ToString().TrimStart();
-        }
+		string command = "";
+		if (parameters.TryGetValue("source", out tmp)) {
+			command = tmp.ToString().TrimStart();
+		}
 
-        tmp = null;
-        if (parameters.TryGetValue("cmd", out tmp)) {
-            var cmd = ((string)tmp).ToLower().Trim();
-            if (cmd == "open") {
-                return async (o) => {
-                    return await openConnection(connectionString, driver);
-                };
-            }
-            if (cmd == "close") {
-                closeConnection(handler);
-                return (o) => {
-                    return Task.FromResult((object)null);
-                };
-            }
-            if (cmd == "nonquery") {
-                if (handler >= 0) {
-                    genericConnection conn = allConn[handler];
-                    return async (o) => {
-                        return await conn.executeNonQueryConn(command, timeOut);
-                    };
-                }
-                else {
+		tmp = null;
+		if (parameters.TryGetValue("cmd", out tmp)) {
+			var cmd = ((string)tmp).ToLower().Trim();
+			if (cmd == "open") {
+				return async (o) => {
+					return await openConnection(connectionString, driver);
+				};
+			}
+			if (cmd == "close") {
+				closeConnection(handler);
+				return (o) => {
+					return Task.FromResult((object)null);
+				};
+			}
+			if (cmd == "nonquery") {
+				if (handler >= 0) {
+					genericConnection conn = allConn[handler];
+					return async (o) => {
+						return await conn.executeNonQueryConn(command, timeOut);
+					};
+				}
+				else {
 
-                    return async (o) => {
+					return async (o) => {
 						genericConnection conn = dispatchConn(connectionString, driver);
 						return await conn.executeNonQuery(command, timeOut);
-                    };
-                }
-            }
-        }
+					};
+				}
+			}
+		}
 
-        int packetSize = 0;
-        object defPSize = 0;
-        if (parameters.TryGetValue("packetSize", out defPSize)) {
-            packetSize = Convert.ToInt32(defPSize);
-        }
-        if (handler != -1) {
-            genericConnection conn = allConn[handler];
-            return async (o) => {
-                return await conn.executeQueryConn(command, packetSize, timeOut, callback);
-            };
-        }
+		int packetSize = 0;
+		object defPSize = 0;
+		if (parameters.TryGetValue("packetSize", out defPSize)) {
+			packetSize = Convert.ToInt32(defPSize);
+		}
+		if (handler != -1) {
+			genericConnection conn = allConn[handler];
+			return async (o) => {
+				return await conn.executeQueryConn(command, packetSize, timeOut, callback);
+			};
+		}
 
-        return async (queryParameters) => {
-            genericConnection conn = dispatchConn(connectionString, driver);
-            return await conn.executeQuery(command, (IDictionary<string, object>)queryParameters,
-                                                   packetSize, timeOut, callback);
-        };
-    }
+		return async (queryParameters) => {
+			genericConnection conn = dispatchConn(connectionString, driver);
+			return await conn.executeQuery(command, (IDictionary<string, object>)queryParameters,
+												   packetSize, timeOut, callback);
+		};
+	}
 
 
-    genericConnection dispatchConn(string connectionString, string driver) {
-        if (driver == "sqlServer") {
-            return new sqlServerConn(connectionString);
-        }
-        if (driver == "mySql") {
-            return new mySqlConn(connectionString);
-        }
+	genericConnection dispatchConn(string connectionString, string driver) {
+		if (driver == "sqlServer") {
+			return new sqlServerConn(connectionString);
+		}
+		if (driver == "mySql") {
+			return new mySqlConn(connectionString);
+		}
 		if (driver == "oracle") {
 			return new OracleConn(connectionString);
 		}
-        return null;
-    }
+		return null;
+	}
 
-    async Task<object> openConnection(string connectionString, string driver) {
-        genericConnection gen = dispatchConn(connectionString, driver);
+	async Task<object> openConnection(string connectionString, string driver) {
+		genericConnection gen = dispatchConn(connectionString, driver);
 
-        try {
-            await gen.open();
-            return AddConnection(gen);
-        }
-        catch (Exception E) {
-            throw new Exception($"Error opening connection {E.ToString()}");
-        }
-    }
+		try {
+			await gen.open();
+			return AddConnection(gen);
+		}
+		catch (Exception E) {
+			throw new Exception($"Error opening connection {E.ToString()}");
+		}
+	}
 
-    void closeConnection(int handler) {
-        allConn[handler].close();
-        RemoveConnection(handler);
-    }
+	void closeConnection(int handler) {
+		allConn[handler].close();
+		RemoveConnection(handler);
+	}
 
-    }
+}
 
 
 /// <summary>
@@ -156,80 +156,80 @@ public class EdgeCompiler {
 /// </summary>
 public abstract class genericConnection {
 
-    /// <summary>
-    /// Executes a generic sql command that can return multiple tables. There are two main use case. 
-    /// If a callback is NOT given, output is in the form:
-    ///   [  result1, result2,...resultN] where result(n) is the n-th table 
-    ///  Any result table is in the form:
-    ///   {meta: [fieldName1, fieldName2,...fieldNameM], rows:[{value1, value2,...valueM}, {value1,...valueM},..]}
-    /// If a callback IS given, and packet size is NOT specified, the callback is called n+1 times, one for each returned table,
-    ///  with {meta: [fieldName1, fieldName2,...fieldNameM]}, {rows:rows:[{value1, value2,...valueM}, {value1,...valueM},..]} given 
-    ///  in subsequent calls.
-    /// At the end of all resultsets the callback is called with {resolve:1} to notify there is no more data to process.
-    /// If a callback IS given, and packet size IS specified, the callback can be called more than one time for each result, any
-    ///   time with no more than packet size rows. This can be useful if you expect to read 1 million rows and don't want to 
-    ///   wait for the last row to start process them. 
-    /// </summary>
-    /// <param name="commandString"></param>
-    /// <param name="parameters"></param>
-    /// <param name="packetSize"></param>
-    /// <param name="timeout"></param>
-    /// <param name="callback"></param>
-    /// <returns></returns>
-    public abstract Task<object> executeQuery(string commandString, IDictionary<string, object> parameters,
-        int packetSize, int timeout, Func<object, Task<object>> callback = null);
+	/// <summary>
+	/// Executes a generic sql command that can return multiple tables. There are two main use case. 
+	/// If a callback is NOT given, output is in the form:
+	///   [  result1, result2,...resultN] where result(n) is the n-th table 
+	///  Any result table is in the form:
+	///   {meta: [fieldName1, fieldName2,...fieldNameM], rows:[{value1, value2,...valueM}, {value1,...valueM},..]}
+	/// If a callback IS given, and packet size is NOT specified, the callback is called n+1 times, one for each returned table,
+	///  with {meta: [fieldName1, fieldName2,...fieldNameM]}, {rows:rows:[{value1, value2,...valueM}, {value1,...valueM},..]} given 
+	///  in subsequent calls.
+	/// At the end of all resultsets the callback is called with {resolve:1} to notify there is no more data to process.
+	/// If a callback IS given, and packet size IS specified, the callback can be called more than one time for each result, any
+	///   time with no more than packet size rows. This can be useful if you expect to read 1 million rows and don't want to 
+	///   wait for the last row to start process them. 
+	/// </summary>
+	/// <param name="commandString"></param>
+	/// <param name="parameters"></param>
+	/// <param name="packetSize"></param>
+	/// <param name="timeout"></param>
+	/// <param name="callback"></param>
+	/// <returns></returns>
+	public abstract Task<object> executeQuery(string commandString, IDictionary<string, object> parameters,
+		int packetSize, int timeout, Func<object, Task<object>> callback = null);
 
-    /// <summary>
-    /// Same as executeQuery, but the connection is opened before running command and then immediately closed.
-    /// </summary>
-    /// <param name="commandString"></param>
-    /// <param name="packetSize"></param>
-    /// <param name="timeout"></param>
-    /// <param name="callback"></param>
-    /// <returns></returns>
-    public abstract Task<object> executeQueryConn(string commandString,
-        int packetSize, int timeout, Func<object, Task<object>> callback = null);
+	/// <summary>
+	/// Same as executeQuery, but the connection is opened before running command and then immediately closed.
+	/// </summary>
+	/// <param name="commandString"></param>
+	/// <param name="packetSize"></param>
+	/// <param name="timeout"></param>
+	/// <param name="callback"></param>
+	/// <returns></returns>
+	public abstract Task<object> executeQueryConn(string commandString,
+		int packetSize, int timeout, Func<object, Task<object>> callback = null);
 
-    /// <summary>
-    /// Executes a command an returns number of affected rows in an object {rowcount: number}
-    /// </summary>
-    /// <param name="commandString"></param>
-    /// <param name="timeOut"></param>
-    /// <returns></returns>
-    public abstract Task<object> executeNonQuery(string commandString, int timeOut);
+	/// <summary>
+	/// Executes a command an returns number of affected rows in an object {rowcount: number}
+	/// </summary>
+	/// <param name="commandString"></param>
+	/// <param name="timeOut"></param>
+	/// <returns></returns>
+	public abstract Task<object> executeNonQuery(string commandString, int timeOut);
 
-    /// <summary>
-    /// Same as executeNonQuery,  but the connection is opened before running command and then immediately closed.
-    /// </summary>
-    /// <param name="commandString"></param>
-    /// <param name="timeOut"></param>
-    /// <returns></returns>
-    public abstract Task<object> executeNonQueryConn(string commandString, int timeOut);
+	/// <summary>
+	/// Same as executeNonQuery,  but the connection is opened before running command and then immediately closed.
+	/// </summary>
+	/// <param name="commandString"></param>
+	/// <param name="timeOut"></param>
+	/// <returns></returns>
+	public abstract Task<object> executeNonQueryConn(string commandString, int timeOut);
 
-    /// <summary>
-    /// Opens the connection. This is meant to be used in conjunction with a series of executeQuery calls.
-    /// </summary>
-    /// <returns></returns>
-    public abstract Task<object> open();
+	/// <summary>
+	/// Opens the connection. This is meant to be used in conjunction with a series of executeQuery calls.
+	/// </summary>
+	/// <returns></returns>
+	public abstract Task<object> open();
 
-    /// <summary>
-    /// Closes and releases the connection. It's important to call this function as soon as the connection is not needed anymore.
-    /// </summary>
-    public abstract void close();
+	/// <summary>
+	/// Closes and releases the connection. It's important to call this function as soon as the connection is not needed anymore.
+	/// </summary>
+	public abstract void close();
 }
 
-public class sqlServerConn : genericConnection {
+public class sqlServerConn :genericConnection {
 	private SqlConnection connection;
 	private string connectionString;
 
-	public sqlServerConn (string connectionString) {
+	public sqlServerConn(string connectionString) {
 		this.connectionString = connectionString;
 	}
 
-	public override async Task<object> open () {
-		connection = new SqlConnection (connectionString);
+	public override async Task<object> open() {
+		connection = new SqlConnection(connectionString);
 		try {
-			await connection.OpenAsync ();
+			await connection.OpenAsync();
 			return true;
 		}
 		catch (Exception E) {
@@ -237,8 +237,8 @@ public class sqlServerConn : genericConnection {
 		}
 	}
 
-	public override void close () {
-		connection.Close ();
+	public override void close() {
+		connection.Close();
 	}
 
 	public override async Task<object> executeQuery(string commandString, IDictionary<string, object> parameters,
@@ -248,36 +248,36 @@ public class sqlServerConn : genericConnection {
 			return await internalExecuteQuery(tempConn, commandString, packetSize, timeout, callback);
 		}
 	}
-	
 
-	public override  async Task<object> executeQueryConn (string commandString,
-	                                                 int packetSize, int timeout, Func<object, Task<object>> callback = null) {
-        if (callback == null) {
-			return await internalExecuteQuery (connection, commandString, packetSize, timeout, callback);
-        }
 
-        //Task.Factory.StartNew(() => internalExecuteQuery(connection, commandString, packetSize, timeout, callback));
-        //return Task.FromResult((object)null); 
-		
-	
+	public override async Task<object> executeQueryConn(string commandString,
+													 int packetSize, int timeout, Func<object, Task<object>> callback = null) {
+		if (callback == null) {
+			return await internalExecuteQuery(connection, commandString, packetSize, timeout, callback);
+		}
+
+		//Task.Factory.StartNew(() => internalExecuteQuery(connection, commandString, packetSize, timeout, callback));
+		//return Task.FromResult((object)null); 
+
+
 		return await internalExecuteQuery(connection, commandString, packetSize, timeout, callback);
 	}
 
-	public override async Task<object> executeNonQuery (string commandString, int timeOut) {
-		using (SqlConnection tempConn = new SqlConnection (connectionString)) {
-			await tempConn.OpenAsync ();
-			return await internalExecuteNonQuery (tempConn, commandString, timeOut);
+	public override async Task<object> executeNonQuery(string commandString, int timeOut) {
+		using (SqlConnection tempConn = new SqlConnection(connectionString)) {
+			await tempConn.OpenAsync();
+			return await internalExecuteNonQuery(tempConn, commandString, timeOut);
 		}
 	}
 
-	public override async Task<object> executeNonQueryConn (string commandString, int timeOut) {
-		return await internalExecuteNonQuery (connection, commandString, timeOut);
+	public override async Task<object> executeNonQueryConn(string commandString, int timeOut) {
+		return await internalExecuteNonQuery(connection, commandString, timeOut);
 	}
 
-	void addParameters (SqlCommand command, IDictionary<string, object> parameters) {
+	void addParameters(SqlCommand command, IDictionary<string, object> parameters) {
 		if (parameters != null) {
 			foreach (KeyValuePair<string, object> parameter in parameters) {
-				command.Parameters.AddWithValue (parameter.Key, parameter.Value ?? DBNull.Value);
+				command.Parameters.AddWithValue(parameter.Key, parameter.Value ?? DBNull.Value);
 			}
 		}
 	}
@@ -368,75 +368,76 @@ public class sqlServerConn : genericConnection {
 		}
 	}
 
-	private async Task<object> internalExecuteNonQuery (SqlConnection connection, string commandString, int timeOut) {
-		SqlCommand command = new SqlCommand (commandString, connection);
+	private async Task<object> internalExecuteNonQuery(SqlConnection connection, string commandString, int timeOut) {
+		SqlCommand command = new SqlCommand(commandString, connection);
 		command.CommandTimeout = timeOut;
 		using (command) {
 			//this.AddParameters(command, parameters);
-			var res = new Dictionary<string, object> { ["rowcount" ] =  await command.ExecuteNonQueryAsync () };
+			var res = new Dictionary<string, object> { ["rowcount"] = await command.ExecuteNonQueryAsync() };
 			return res;
 		}
 	}
 }
 
-public class mySqlConn : genericConnection {
+public class mySqlConn :genericConnection {
 	private MySqlConnection connection;
 	private string connectionString;
 
-	public mySqlConn (string connectionString) {
+	public mySqlConn(string connectionString) {
 		this.connectionString = connectionString;
 	}
 
-	public async override Task<object> open () {
-		connection = new MySqlConnection (connectionString);
+	public async override Task<object> open() {
+		connection = new MySqlConnection(connectionString);
 		try {
 			await connection.OpenAsync();
 			return true;
-		} catch (Exception E)  {
-			throw new Exception ("Error opening connection:"+E.ToString());
+		}
+		catch (Exception E) {
+			throw new Exception("Error opening connection:" + E.ToString());
 		}
 	}
 
-	public override void close () {
-		connection.Close ();
+	public override void close() {
+		connection.Close();
 	}
 
-	public override async Task<object> executeQuery (string commandString, IDictionary<string, object> parameters,
-	                                                  int packetSize, int timeout, Func<object, Task<object>> callback = null) {
-		using (MySqlConnection tempConn = new MySqlConnection (connectionString)) {
-			await tempConn.OpenAsync ();
-			return  await internalExecuteQuery (tempConn, commandString, packetSize, timeout, callback);
+	public override async Task<object> executeQuery(string commandString, IDictionary<string, object> parameters,
+													  int packetSize, int timeout, Func<object, Task<object>> callback = null) {
+		using (MySqlConnection tempConn = new MySqlConnection(connectionString)) {
+			await tempConn.OpenAsync();
+			return await internalExecuteQuery(tempConn, commandString, packetSize, timeout, callback);
 		}
 	}
 
-	public override async Task<object> executeQueryConn (string commandString,
-	                                                int packetSize, int timeout, Func<object, Task<object>> callback = null) {
-        if (callback == null) {
-            return await internalExecuteQuery (connection, commandString, packetSize, timeout, callback);
-        }
-    	//Task.Factory.StartNew(() =>  internalExecuteQuery(connection, commandString, packetSize, timeout, callback));
-    	//return Task.FromResult((object)null);
+	public override async Task<object> executeQueryConn(string commandString,
+													int packetSize, int timeout, Func<object, Task<object>> callback = null) {
+		if (callback == null) {
+			return await internalExecuteQuery(connection, commandString, packetSize, timeout, callback);
+		}
+		//Task.Factory.StartNew(() =>  internalExecuteQuery(connection, commandString, packetSize, timeout, callback));
+		//return Task.FromResult((object)null);
 
-    	return await internalExecuteQuery(connection, commandString, packetSize, timeout, callback);
-    }
+		return await internalExecuteQuery(connection, commandString, packetSize, timeout, callback);
+	}
 
 
-	public override async Task<object> executeNonQuery (string commandString, int timeOut) {
-		using (MySqlConnection tempConn = new MySqlConnection (connectionString)) {
-			await tempConn.OpenAsync ();
-			return  await internalExecuteNonQuery (tempConn, commandString, timeOut);
+	public override async Task<object> executeNonQuery(string commandString, int timeOut) {
+		using (MySqlConnection tempConn = new MySqlConnection(connectionString)) {
+			await tempConn.OpenAsync();
+			return await internalExecuteNonQuery(tempConn, commandString, timeOut);
 		}
 	}
 
-	public override  async Task<object> executeNonQueryConn (string commandString, int timeOut) {
-		return  await internalExecuteNonQuery (connection, commandString, timeOut);
+	public override async Task<object> executeNonQueryConn(string commandString, int timeOut) {
+		return await internalExecuteNonQuery(connection, commandString, timeOut);
 
 	}
 
-	void addParameters (MySqlCommand command, IDictionary<string, object> parameters) {
+	void addParameters(MySqlCommand command, IDictionary<string, object> parameters) {
 		if (parameters != null) {
 			foreach (KeyValuePair<string, object> parameter in parameters) {
-				command.Parameters.AddWithValue (parameter.Key, parameter.Value ?? DBNull.Value);
+				command.Parameters.AddWithValue(parameter.Key, parameter.Value ?? DBNull.Value);
 			}
 		}
 	}
@@ -523,77 +524,78 @@ public class mySqlConn : genericConnection {
 				await callback(res);
 				return null;
 			}
-			return res;			
+			return res;
 		}
 	}
 
-	private async Task<object> internalExecuteNonQuery (MySqlConnection connection, string commandString, int timeOut) {
-		MySqlCommand command = new MySqlCommand (commandString, connection);
+	private async Task<object> internalExecuteNonQuery(MySqlConnection connection, string commandString, int timeOut) {
+		MySqlCommand command = new MySqlCommand(commandString, connection);
 		command.CommandTimeout = timeOut;
 		using (command) {
 			//this.AddParameters(command, parameters);
-			var res = new Dictionary<string, object> { ["rowcount" ] =  await command.ExecuteNonQueryAsync () };
+			var res = new Dictionary<string, object> { ["rowcount"] = await command.ExecuteNonQueryAsync() };
 			return res;
 		}
 	}
 }
 
-	
-public class OracleConn : genericConnection {
+
+public class OracleConn :genericConnection {
 	private OracleConnection connection;
 	private string connectionString;
 
-	public OracleConn (string connectionString) {
+	public OracleConn(string connectionString) {
 		this.connectionString = connectionString;
 	}
 
-	public async override Task<object> open () {
-		connection = new OracleConnection (connectionString);
+	public async override Task<object> open() {
+		connection = new OracleConnection(connectionString);
 		try {
 			await connection.OpenAsync();
 			return true;
-		} catch (Exception E)  {
-			throw new Exception ("Error opening connection:"+E.ToString());
+		}
+		catch (Exception E) {
+			throw new Exception("Error opening connection:" + E.ToString());
 		}
 	}
 
-	public override void close () {
-		connection.Close ();
+	public override void close() {
+		connection.Close();
 	}
 
-	public override async Task<object> executeQuery (string commandString, IDictionary<string, object> parameters,
-	                                                  int packetSize, int timeout, Func<object, Task<object>> callback = null) {
-		using (OracleConnection tempConn = new OracleConnection (connectionString)) {
-			await tempConn.OpenAsync ();
-			return  await internalExecuteQuery (tempConn, commandString, packetSize, timeout, callback);
+	public override async Task<object> executeQuery(string commandString, IDictionary<string, object> parameters,
+													  int packetSize, int timeout, Func<object, Task<object>> callback = null) {
+		using (OracleConnection tempConn = new OracleConnection(connectionString)) {
+			await tempConn.OpenAsync();
+			return await internalExecuteQuery(tempConn, commandString, packetSize, timeout, callback);
 		}
 	}
 
-	public override async Task<object> executeQueryConn (string commandString,
-	                                                int packetSize, int timeout, Func<object, Task<object>> callback = null) {
-        if (callback == null) {
-            return await internalExecuteQuery (connection, commandString, packetSize, timeout, callback);
-        }
+	public override async Task<object> executeQueryConn(string commandString,
+													int packetSize, int timeout, Func<object, Task<object>> callback = null) {
+		if (callback == null) {
+			return await internalExecuteQuery(connection, commandString, packetSize, timeout, callback);
+		}
 		//Task.Factory.StartNew(() =>  internalExecuteQuery(connection, commandString, packetSize, timeout, callback));
 		//return Task.FromResult((object)null);
 
 		return await internalExecuteQuery(connection, commandString, packetSize, timeout, callback);
-    }
+	}
 
 
-	public override async Task<object> executeNonQuery (string commandString, int timeOut) {
-		using (OracleConnection tempConn = new OracleConnection (connectionString)) {
-			await tempConn.OpenAsync ();
-			return  await internalExecuteNonQuery (tempConn, commandString, timeOut);
+	public override async Task<object> executeNonQuery(string commandString, int timeOut) {
+		using (OracleConnection tempConn = new OracleConnection(connectionString)) {
+			await tempConn.OpenAsync();
+			return await internalExecuteNonQuery(tempConn, commandString, timeOut);
 		}
 	}
 
-	public override  async Task<object> executeNonQueryConn (string commandString, int timeOut) {
-		return await internalExecuteNonQuery (connection, commandString, timeOut);
+	public override async Task<object> executeNonQueryConn(string commandString, int timeOut) {
+		return await internalExecuteNonQuery(connection, commandString, timeOut);
 
 	}
 
-	void addParameters (OracleCommand command, IDictionary<string, object> parameters) {
+	void addParameters(OracleCommand command, IDictionary<string, object> parameters) {
 		if (parameters != null) {
 			foreach (KeyValuePair<string, object> parameter in parameters) {
 				//command.Parameters.AddWithValue (parameter.Key, parameter.Value ?? DBNull.Value);
@@ -607,9 +609,9 @@ public class OracleConn : genericConnection {
 		try {
 			List<object> rows = new List<object>();
 			using (OracleCommand command = new OracleCommand(commandString, connection)) {
-				using (OracleDataReader reader = (OracleDataReader) await command.ExecuteReaderAsync(CommandBehavior.Default)) {
-                    reader.SuppressGetDecimalInvalidCastException = true;
-                    do {
+				using (OracleDataReader reader = (OracleDataReader)await command.ExecuteReaderAsync(CommandBehavior.Default)) {
+					reader.SuppressGetDecimalInvalidCastException = true;
+					do {
 						Dictionary<string, object> res;
 						object[] fieldNames = new object[reader.FieldCount];
 						for (int i = 0; i < reader.FieldCount; i++) {
@@ -626,7 +628,7 @@ public class OracleConn : genericConnection {
 
 						res["rows"] = localRows;
 						IDataRecord record = (IDataRecord)reader;
-                        while (reader.Read()) {
+						while (reader.Read()) {
 							object[] resultRecord = new object[record.FieldCount];
 							record.GetValues(resultRecord);
 							for (int i = 0; i < record.FieldCount; i++) {
@@ -685,17 +687,17 @@ public class OracleConn : genericConnection {
 				await callback(res);
 				return null;
 			}
-			return res;			
+			return res;
 		}
 	}
 
-	private async Task<object> internalExecuteNonQuery (OracleConnection connection, string commandString, int timeOut) {
-		OracleCommand command = new OracleCommand (commandString, connection);
+	private async Task<object> internalExecuteNonQuery(OracleConnection connection, string commandString, int timeOut) {
+		OracleCommand command = new OracleCommand(commandString, connection);
 		command.CommandTimeout = timeOut;
 		using (command) {
-            //this.AddParameters(command, parameters);
-            var res = new Dictionary<string, object> { ["rowcount" ] =  await command.ExecuteNonQueryAsync () };
-            return res;
+			//this.AddParameters(command, parameters);
+			var res = new Dictionary<string, object> { ["rowcount"] = await command.ExecuteNonQueryAsync() };
+			return res;
 		}
 	}
 }
