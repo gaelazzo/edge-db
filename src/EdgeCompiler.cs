@@ -289,6 +289,7 @@ public class sqlServerConn :genericConnection {
 			using (SqlCommand command = new SqlCommand(commandString, connection)) {
 				using (var reader = await command.ExecuteReaderAsync(CommandBehavior.Default)) {
 					do {
+						bool metaSent = false;
 						Dictionary<string, object> res;
 						object[] fieldNames = new object[reader.FieldCount];
 						for (int i = 0; i < reader.FieldCount; i++) {
@@ -300,7 +301,7 @@ public class sqlServerConn :genericConnection {
 						res["meta"] = fieldNames;
 						if (callback != null && packetSize > 0) {
 							await callback(res);
-							res = new Dictionary<string, object>();//only if packetized, sends a "meta" alone
+							res = new Dictionary<string, object>();//only if packetized, sends a "meta" alone						
 						}
 
 						res["rows"] = localRows;
@@ -339,13 +340,14 @@ public class sqlServerConn :genericConnection {
 						}
 
 						if (callback != null) {
-							if (localRows.Count > 0) {
+							if (localRows.Count > 0 || (metaSent==false)) {								
 								await callback(res); //sends res with meta or only with rows (if not first packet of that set)
 							}
 						}
 						else {
 							rows.Add(res); //if ther is not callback, result will be sent alltogether
 						}
+						metaSent=false;
 					} while (await reader.NextResultAsync());
 
 				}
