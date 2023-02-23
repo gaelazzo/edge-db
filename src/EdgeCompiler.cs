@@ -302,6 +302,7 @@ public class sqlServerConn :genericConnection {
 						if (callback != null && packetSize > 0) {
 							await callback(res);
 							res = new Dictionary<string, object>();//only if packetized, sends a "meta" alone						
+							metaSent = true;
 						}
 
 						res["rows"] = localRows;
@@ -340,14 +341,19 @@ public class sqlServerConn :genericConnection {
 						}
 
 						if (callback != null) {
-							if (localRows.Count > 0 || (metaSent==false)) {								
+							if (localRows.Count > 0 ) {								
 								await callback(res); //sends res with meta or only with rows (if not first packet of that set)
+							}
+							else {
+								if (metaSent == false) {
+									res.Remove("rows");
+									await callback(res);
+								}
 							}
 						}
 						else {
 							rows.Add(res); //if ther is not callback, result will be sent alltogether
-						}
-						metaSent=false;
+						}						
 					} while (await reader.NextResultAsync());
 
 				}
@@ -451,6 +457,7 @@ public class mySqlConn :genericConnection {
 			using (MySqlCommand command = new MySqlCommand(commandString, connection)) {
 				using (DbDataReader reader = await command.ExecuteReaderAsync(CommandBehavior.Default)) {
 					do {
+						bool metaSent = false;
 						Dictionary<string, object> res;
 						object[] fieldNames = new object[reader.FieldCount];
 						for (int i = 0; i < reader.FieldCount; i++) {
@@ -463,6 +470,7 @@ public class mySqlConn :genericConnection {
 						if (callback != null && packetSize > 0) {
 							await callback(res);   //Call is voluntarily NOT awaited. So processing can be done while this thread keeps reading.              
 							res = new Dictionary<string, object>();
+							metaSent = true;
 						}
 
 						res["rows"] = localRows;
@@ -484,6 +492,13 @@ public class mySqlConn :genericConnection {
 								else if (type == typeof(byte[]) || type == typeof(char[])) {
 									resultRecord[i] = Convert.ToBase64String((byte[])resultRecord[i]);
 								}
+								else if (type == typeof(DateTime)) {
+									var d = ((DateTime)resultRecord[i]);
+									if (d.Kind == DateTimeKind.Unspecified) {
+										d = new DateTime(d.Ticks, DateTimeKind.Local);
+									}
+									resultRecord[i] = d;
+								}
 								else if (type == typeof(Guid)) { //|| type == typeof(DateTime)
 									resultRecord[i] = resultRecord[i].ToString();
 								}
@@ -500,9 +515,15 @@ public class mySqlConn :genericConnection {
 							}
 						}
 
-						if (callback != null) {
+						if(callback != null) {
 							if (localRows.Count > 0) {
-								await callback(res);
+								await callback(res); //sends res with meta or only with rows (if not first packet of that set)
+							}
+							else {
+								if (metaSent == false) {
+									res.Remove("rows");
+									await callback(res);
+								}
 							}
 						}
 						else {
@@ -614,6 +635,7 @@ public class OracleConn :genericConnection {
 				using (OracleDataReader reader = (OracleDataReader)await command.ExecuteReaderAsync(CommandBehavior.Default)) {
 					reader.SuppressGetDecimalInvalidCastException = true;
 					do {
+						bool metaSent = false;
 						Dictionary<string, object> res;
 						object[] fieldNames = new object[reader.FieldCount];
 						for (int i = 0; i < reader.FieldCount; i++) {
@@ -624,13 +646,14 @@ public class OracleConn :genericConnection {
 						List<object> localRows = new List<object>();
 						res["meta"] = fieldNames;
 						if (callback != null && packetSize > 0) {
-							await callback(res);   //Call is voluntarily NOT awaited. So processing can be done while this thread keeps reading.              
+							await callback(res);   
 							res = new Dictionary<string, object>();
+							metaSent = true;
 						}
 
 						res["rows"] = localRows;
 						IDataRecord record = (IDataRecord)reader;
-						while (reader.Read()) {
+						while (reader.Read()) {							
 							object[] resultRecord = new object[record.FieldCount];
 							record.GetValues(resultRecord);
 							for (int i = 0; i < record.FieldCount; i++) {
@@ -647,6 +670,13 @@ public class OracleConn :genericConnection {
 								else if (type == typeof(byte[]) || type == typeof(char[])) {
 									resultRecord[i] = Convert.ToBase64String((byte[])resultRecord[i]);
 								}
+								else if (type == typeof(DateTime)) {
+									var d = ((DateTime)resultRecord[i]);
+									if (d.Kind == DateTimeKind.Unspecified) {
+										d = new DateTime(d.Ticks, DateTimeKind.Local);
+									}
+									resultRecord[i] = d;
+								}
 								else if (type == typeof(Guid)) { //|| type == typeof(DateTime)
 									resultRecord[i] = resultRecord[i].ToString();
 								}
@@ -662,15 +692,21 @@ public class OracleConn :genericConnection {
 								res["rows"] = localRows;
 							}
 						}
-
 						if (callback != null) {
 							if (localRows.Count > 0) {
-								await callback(res);
+								await callback(res); //sends res with meta or only with rows (if not first packet of that set)
+							}
+							else {
+								if (metaSent == false) {
+									res.Remove("rows");
+									await callback(res);
+								}
 							}
 						}
 						else {
-							rows.Add(res);
+							rows.Add(res); //if ther is not callback, result will be sent alltogether
 						}
+
 					} while (await reader.NextResultAsync());
 
 				}
