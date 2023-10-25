@@ -324,6 +324,13 @@ public class sqlServerConn :genericConnection {
 								else if (type == typeof(byte[]) || type == typeof(char[])) {
 									resultRecord[i] = Convert.ToBase64String((byte[])resultRecord[i]);
 								}
+								else if (type == typeof(DateTime)) {
+									var d = ((DateTime)resultRecord[i]);
+									if (d.Kind == DateTimeKind.Unspecified) {
+										d = new DateTime(d.Ticks, DateTimeKind.Local);
+									}
+									resultRecord[i] = d;
+								}
 								else if (type == typeof(Guid)) { //|| type == typeof(DateTime)
 									resultRecord[i] = resultRecord[i].ToString();
 								}
