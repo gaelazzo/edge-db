@@ -1,6 +1,6 @@
 {
   "name": "@gaelazzo/edge-db",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Access any database from Node.js using Edge.js and ADO.NET",
   "tags": [
     "sqlServer",

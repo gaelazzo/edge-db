@@ -55,8 +55,8 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="destroy-Oracle.sql" />
-    <Content Include="destroy.sql" />
-    <Content Include="setup-Oracle.sql" />
+    <None Include="destroy-Oracle.sql" />
+    <None Include="destroy.sql" />
+    <None Include="setup-Oracle.sql" />
   </ItemGroup>
 </Project>

@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.33516.290
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "edge-db", "src\edge-db.csproj", "{C64EE1C0-8A26-426E-B955-B46BC6C13055}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "edge-db", "src\edge-db.csproj", "{C64EE1C0-8A26-426E-B955-B46BC6C13055}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "unit", "unit\unit.csproj", "{85FF7757-CBC5-4F90-8F64-3DCA35C4866A}"
 EndProject
@@ -26,6 +26,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "lib", "lib", "{E3F3D8E0-A2D
 		lib\nunit.framework.xml = lib\nunit.framework.xml
 		lib\Oracle.ManagedDataAccess.dll = lib\Oracle.ManagedDataAccess.dll
 		lib\System.Data.DataSetExtensions.dll = lib\System.Data.DataSetExtensions.dll
+		C:\Users\Utente\.nuget\packages\system.data.sqlclient\4.8.5\lib\netstandard2.0\System.Data.SqlClient.dll = C:\Users\Utente\.nuget\packages\system.data.sqlclient\4.8.5\lib\netstandard2.0\System.Data.SqlClient.dll
 	EndProjectSection
 EndProject
 Global
@@ -57,7 +58,7 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		VisualSVNWorkingCopyRoot = .
 		SolutionGuid = {874EC1F9-F72A-4D5A-9D9F-FF113F5E1884}
+		VisualSVNWorkingCopyRoot = .
 	EndGlobalSection
 EndGlobal
