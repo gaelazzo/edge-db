@@ -65,11 +65,7 @@ namespace unitOracle {
 
         public static void runFile(int handler, string scriptName) {
             string path = Path.Combine(
-                  Directory.GetParent(
-                      Directory.GetParent(
-                          Directory.GetCurrentDirectory()
-                      ).FullName
-                  ).FullName,
+                    Directory.GetCurrentDirectory(),"unit",                  
                   scriptName);
             string[] all = File.ReadAllLines(path);
             string script = "";
@@ -93,14 +89,14 @@ namespace unitOracle {
         }
 
 
-        [SetUp]
+        [OneTimeSetUp]
         public void runBeforeAnyTests() {
             int handler = open();
             runFile(handler, "setup-Oracle.sql");
             close(handler);
         }
 
-        [TearDown]
+        [OneTimeTearDown]
         public void runAfterAnyTests() {
             int handler = open();
             runFile(handler, "destroy-Oracle.sql");
@@ -180,12 +176,8 @@ namespace unitOracle {
 		[Test ()]
 		public void setupScriptShouldExist() {
 
-			string path = Path.Combine(
-				Directory.GetParent(
-					Directory.GetParent(
-						Directory.GetCurrentDirectory()
-					).FullName
-				).FullName,
+			string path = Path.Combine(				
+						Directory.GetCurrentDirectory(),"unit",				
 				"setup-Oracle.sql");
 			Assert.IsTrue(File.Exists(path), "setup script should be present in "+path);
 		}
